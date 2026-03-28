@@ -23,6 +23,7 @@
         <sonar.coverage.jacoco.xmlReportPaths>
             ${project.build.directory}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
         </sonar.coverage.jacoco.xmlReportPaths>
+            <sonar.organization>weltreise-dora-the-explorer</sonar.organization>
     </properties>
 
     <dependencyManagement>

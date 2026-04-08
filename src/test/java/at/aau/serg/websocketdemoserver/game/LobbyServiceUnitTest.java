@@ -2,6 +2,7 @@ package at.aau.serg.websocketdemoserver.game;
 
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
+import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +29,10 @@ class LobbyServiceUnitTest {
         service.joinLobby("lobby-1", "player-1");
 
         assertThatThrownBy(() -> service.joinLobby("lobby-1", "player-1"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PLAYER_ALREADY_JOINED);
+        assertThatThrownBy(() -> service.joinLobby("lobby-1", "player-1"))
                 .hasMessageContaining("already joined");
     }
 
@@ -52,7 +56,10 @@ class LobbyServiceUnitTest {
         service.joinLobby("lobby-1", "player-1");
 
         assertThatThrownBy(() -> service.startGame("lobby-1"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.MIN_PLAYERS_NOT_REACHED);
+        assertThatThrownBy(() -> service.startGame("lobby-1"))
                 .hasMessageContaining("At least two players");
     }
 

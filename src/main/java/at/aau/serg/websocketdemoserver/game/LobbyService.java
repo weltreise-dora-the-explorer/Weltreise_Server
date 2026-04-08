@@ -2,6 +2,7 @@ package at.aau.serg.websocketdemoserver.game;
 
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
+import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerState;
 import org.springframework.stereotype.Service;
 
@@ -23,10 +24,10 @@ public class LobbyService {
         GameRoomState state = lobbyStore.getOrCreate(lobbyId);
 
         if (state.getPhase() != GamePhase.LOBBY) {
-            throw new IllegalArgumentException("Cannot join started game");
+            throw new GameException(ErrorCode.CANNOT_JOIN_STARTED_GAME, "Cannot join started game");
         }
         if (containsPlayer(state.getPlayers(), playerId)) {
-            throw new IllegalArgumentException("Player already joined lobby");
+            throw new GameException(ErrorCode.PLAYER_ALREADY_JOINED, "Player already joined lobby");
         }
 
         state.getPlayers().add(new PlayerState(playerId, null, 0));
@@ -37,11 +38,11 @@ public class LobbyService {
     public GameRoomState leaveLobby(String lobbyId, String playerId) {
         validatePlayerId(playerId);
         GameRoomState state = lobbyStore.get(lobbyId)
-                .orElseThrow(() -> new IllegalArgumentException("Lobby not found"));
+                .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
 
         int leavingIndex = indexOfPlayer(state.getPlayers(), playerId);
         if (leavingIndex < 0) {
-            throw new IllegalArgumentException("Player is not in lobby");
+            throw new GameException(ErrorCode.PLAYER_NOT_IN_LOBBY, "Player is not in lobby");
         }
 
         String previousCurrentPlayer = state.getCurrentPlayerId();
@@ -64,13 +65,13 @@ public class LobbyService {
 
     public GameRoomState startGame(String lobbyId) {
         GameRoomState state = lobbyStore.get(lobbyId)
-                .orElseThrow(() -> new IllegalArgumentException("Lobby not found"));
+                .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
 
         if (state.getPhase() != GamePhase.LOBBY) {
-            throw new IllegalArgumentException("Game already started");
+            throw new GameException(ErrorCode.GAME_ALREADY_STARTED, "Game already started");
         }
         if (state.getPlayers().size() < MIN_PLAYERS_TO_START) {
-            throw new IllegalArgumentException("At least two players are required");
+            throw new GameException(ErrorCode.MIN_PLAYERS_NOT_REACHED, "At least two players are required");
         }
 
         state.setPhase(GamePhase.IN_TURN);
@@ -95,7 +96,7 @@ public class LobbyService {
 
     private void validatePlayerId(String playerId) {
         if (playerId == null || playerId.isBlank()) {
-            throw new IllegalArgumentException("Player id is required");
+            throw new GameException(ErrorCode.MISSING_PLAYER_ID, "Player id is required");
         }
     }
 }

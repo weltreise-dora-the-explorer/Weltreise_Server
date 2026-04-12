@@ -1,0 +1,8 @@
+/Users/phillipos/Documents/UNIVERSITÄT AAU/4. Semester/Software Engineering 2/UE/Weltreise/Weltreise_Server/src/test/java/at/aau/serg/websocketdemoserver/WebSocketBrokerIntegrationTest.java
+/Users/phillipos/Documents/UNIVERSITÄT AAU/4. Semester/Software Engineering 2/UE/Weltreise/Weltreise_Server/src/test/java/at/aau/serg/websocketdemoserver/WebSocketHandlerIntegrationTest.java
+/Users/phillipos/Documents/UNIVERSITÄT AAU/4. Semester/Software Engineering 2/UE/Weltreise/Weltreise_Server/src/test/java/at/aau/serg/websocketdemoserver/game/GameCommandServiceUnitTest.java
+/Users/phillipos/Documents/UNIVERSITÄT AAU/4. Semester/Software Engineering 2/UE/Weltreise/Weltreise_Server/src/test/java/at/aau/serg/websocketdemoserver/game/LobbyServiceUnitTest.java
+/Users/phillipos/Documents/UNIVERSITÄT AAU/4. Semester/Software Engineering 2/UE/Weltreise/Weltreise_Server/src/test/java/at/aau/serg/websocketdemoserver/messaging/dtos/TurnBasedDtosUnitTest.java
+/Users/phillipos/Documents/UNIVERSITÄT AAU/4. Semester/Software Engineering 2/UE/Weltreise/Weltreise_Server/src/test/java/at/aau/serg/websocketdemoserver/websocket/StompFrameHandlerClientImpl.java
+/Users/phillipos/Documents/UNIVERSITÄT AAU/4. Semester/Software Engineering 2/UE/Weltreise/Weltreise_Server/src/test/java/at/aau/serg/websocketdemoserver/websocket/WebSocketHandlerClientImpl.java
+/Users/phillipos/Documents/UNIVERSITÄT AAU/4. Semester/Software Engineering 2/UE/Weltreise/Weltreise_Server/src/test/java/at/aau/serg/websocketdemoserver/websocket/broker/WebSocketBrokerControllerUnitTest.java

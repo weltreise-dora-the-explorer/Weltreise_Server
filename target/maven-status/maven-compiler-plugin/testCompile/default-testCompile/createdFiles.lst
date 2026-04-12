@@ -1,0 +1,10 @@
+at/aau/serg/websocketdemoserver/websocket/broker/WebSocketBrokerControllerUnitTest.class
+at/aau/serg/websocketdemoserver/messaging/dtos/TurnBasedDtosUnitTest.class
+at/aau/serg/websocketdemoserver/WebSocketBrokerIntegrationTest$1.class
+at/aau/serg/websocketdemoserver/websocket/WebSocketHandlerClientImpl.class
+at/aau/serg/websocketdemoserver/game/GameCommandServiceUnitTest$FixedRandom.class
+at/aau/serg/websocketdemoserver/websocket/StompFrameHandlerClientImpl.class
+at/aau/serg/websocketdemoserver/WebSocketHandlerIntegrationTest.class
+at/aau/serg/websocketdemoserver/WebSocketBrokerIntegrationTest.class
+at/aau/serg/websocketdemoserver/game/LobbyServiceUnitTest.class
+at/aau/serg/websocketdemoserver/game/GameCommandServiceUnitTest.class

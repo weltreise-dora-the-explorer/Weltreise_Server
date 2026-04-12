@@ -1,0 +1,17 @@
+at/aau/serg/websocketdemoserver/messaging/dtos/OutputMessage.class
+at/aau/serg/websocketdemoserver/messaging/dtos/GameRoomState.class
+at/aau/serg/websocketdemoserver/messaging/dtos/GamePhase.class
+at/aau/serg/websocketdemoserver/messaging/dtos/ClientCommand.class
+at/aau/serg/websocketdemoserver/game/InMemoryLobbyStore.class
+at/aau/serg/websocketdemoserver/messaging/dtos/CommandType.class
+at/aau/serg/websocketdemoserver/messaging/dtos/PlayerState.class
+at/aau/serg/websocketdemoserver/game/GameCommandService.class
+at/aau/serg/websocketdemoserver/WebSocketDemoServerApplication.class
+at/aau/serg/websocketdemoserver/websocket/handler/WebSocketHandlerImpl.class
+at/aau/serg/websocketdemoserver/websocket/broker/WebSocketBrokerController.class
+at/aau/serg/websocketdemoserver/websocket/broker/WebSocketBrokerController$1.class
+at/aau/serg/websocketdemoserver/websocket/broker/WebSocketBrokerConfig.class
+at/aau/serg/websocketdemoserver/messaging/dtos/StompMessage.class
+at/aau/serg/websocketdemoserver/websocket/handler/WebSocketHandlerConfig.class
+at/aau/serg/websocketdemoserver/messaging/dtos/CommandResponse.class
+at/aau/serg/websocketdemoserver/game/LobbyService.class

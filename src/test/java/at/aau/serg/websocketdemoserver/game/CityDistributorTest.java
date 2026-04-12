@@ -1,6 +1,7 @@
 package at.aau.serg.websocketdemoserver.game;
 
 import at.aau.serg.websocketdemoserver.game.models.City;
+import at.aau.serg.websocketdemoserver.game.models.CityColor;
 import at.aau.serg.websocketdemoserver.game.models.Continent;
 import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,27 +35,38 @@ class CityDistributorTest {
         // Liste: 4 Kontinente mit je 6 Städten
         testCities = new ArrayList<>(List.of(
                 // Europa (6)
-                new City("Wien", Continent.EUROPE), new City("Berlin", Continent.EUROPE),
-                new City("Paris", Continent.EUROPE), new City("Rom", Continent.EUROPE),
-                new City("Madrid", Continent.EUROPE), new City("London", Continent.EUROPE),
+                new City("wien", "Wien", Continent.EUROPE, CityColor.RED),
+                new City("berlin", "Berlin", Continent.EUROPE, CityColor.RED),
+                new City("paris", "Paris", Continent.EUROPE, CityColor.BLUE),
+                new City("rom", "Rom", Continent.EUROPE, CityColor.BLUE),
+                new City("madrid", "Madrid", Continent.EUROPE, CityColor.GREEN),
+                new City("london", "London", Continent.EUROPE, CityColor.GREEN),
                 // Asien (6)
-                new City("Tokio", Continent.ASIA), new City("Peking", Continent.ASIA),
-                new City("Bangkok", Continent.ASIA), new City("Seoul", Continent.ASIA),
-                new City("Neu-Delhi", Continent.ASIA), new City("Singapur", Continent.ASIA),
+                new City("tokio", "Tokio", Continent.ASIA, CityColor.RED),
+                new City("peking", "Peking", Continent.ASIA, CityColor.RED),
+                new City("bangkok", "Bangkok", Continent.ASIA, CityColor.BLUE),
+                new City("seoul", "Seoul", Continent.ASIA, CityColor.BLUE),
+                new City("neu-delhi", "Neu-Delhi", Continent.ASIA, CityColor.GREEN),
+                new City("singapur", "Singapur", Continent.ASIA, CityColor.GREEN),
                 // Nordamerika (6)
-                new City("New York", Continent.NORTH_AMERICA), new City("Los Angeles", Continent.NORTH_AMERICA),
-                new City("Toronto", Continent.NORTH_AMERICA), new City("Chicago", Continent.NORTH_AMERICA),
-                new City("Mexiko-Stadt", Continent.NORTH_AMERICA), new City("Miami", Continent.NORTH_AMERICA),
+                new City("new-york", "New York", Continent.NORTH_AMERICA, CityColor.RED),
+                new City("los-angeles", "Los Angeles", Continent.NORTH_AMERICA, CityColor.RED),
+                new City("toronto", "Toronto", Continent.NORTH_AMERICA, CityColor.BLUE),
+                new City("chicago", "Chicago", Continent.NORTH_AMERICA, CityColor.BLUE),
+                new City("mexiko-stadt", "Mexiko-Stadt", Continent.NORTH_AMERICA, CityColor.GREEN),
+                new City("miami", "Miami", Continent.NORTH_AMERICA, CityColor.GREEN),
                 // Südamerika (6)
-                new City("Rio de Janeiro", Continent.SOUTH_AMERICA), new City("Buenos Aires", Continent.SOUTH_AMERICA),
-                new City("Lima", Continent.SOUTH_AMERICA), new City("Bogota", Continent.SOUTH_AMERICA),
-                new City("Santiago", Continent.SOUTH_AMERICA), new City("Quito", Continent.SOUTH_AMERICA)
+                new City("rio", "Rio de Janeiro", Continent.SOUTH_AMERICA, CityColor.RED),
+                new City("buenos-aires", "Buenos Aires", Continent.SOUTH_AMERICA, CityColor.RED),
+                new City("lima", "Lima", Continent.SOUTH_AMERICA, CityColor.BLUE),
+                new City("bogota", "Bogota", Continent.SOUTH_AMERICA, CityColor.BLUE),
+                new City("santiago", "Santiago", Continent.SOUTH_AMERICA, CityColor.GREEN),
+                new City("quito", "Quito", Continent.SOUTH_AMERICA, CityColor.GREEN)
         ));
     }
 
     @Test
     void distributeByContinent_givesCorrectAmountForMultiplePlayers() {
-        // Normalfall: Jeder zieht 2 Karten pro Kontinent
         distributor.distributeByContinent(testCities, players, 2);
 
         for (PlayerState player : players) {
@@ -79,8 +91,9 @@ class CityDistributorTest {
 
     @Test
     void distributeByContinent_handlesNotEnoughCitiesInPool() {
-        // Randfall: Zu wenige Städte
-        List<City> fewCities = new ArrayList<>(List.of(new City("Wien", Continent.EUROPE)));
+        List<City> fewCities = new ArrayList<>(List.of(
+                new City("wien", "Wien", Continent.EUROPE, CityColor.RED)
+        ));
 
         distributor.distributeByContinent(fewCities, players, 2);
 
@@ -94,7 +107,6 @@ class CityDistributorTest {
 
     @Test
     void distributeByContinent_handlesEmptyCityListWithoutCrashing() {
-        // Randfall: Gar keine Städte
         List<City> emptyCities = Collections.emptyList();
 
         distributor.distributeByContinent(emptyCities, players, 2);
@@ -109,7 +121,6 @@ class CityDistributorTest {
     void distributeByContinent_handlesEmptyPlayerList() {
         List<PlayerState> noPlayers = Collections.emptyList();
 
-        // Sollte nicht crashen
         distributor.distributeByContinent(testCities, noPlayers, 2);
     }
 
@@ -125,13 +136,11 @@ class CityDistributorTest {
     void distributeByContinent_noCityAssignedTwice() {
         distributor.distributeByContinent(testCities, players, 2);
 
-        // Alle zugeteilten Städte sammeln
         List<City> allAssigned = new ArrayList<>();
         for (PlayerState player : players) {
             allAssigned.addAll(player.getOwnedCities());
         }
 
-        // Keine Duplikate
         long uniqueCount = allAssigned.stream().distinct().count();
         assertEquals(allAssigned.size(), uniqueCount, "Keine Stadt darf doppelt vergeben werden");
     }

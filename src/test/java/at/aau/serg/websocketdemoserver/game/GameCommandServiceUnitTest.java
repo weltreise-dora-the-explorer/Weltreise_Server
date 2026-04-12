@@ -4,6 +4,9 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
+import at.aau.serg.websocketdemoserver.game.models.City;
+import at.aau.serg.websocketdemoserver.game.models.CityColor;
+import at.aau.serg.websocketdemoserver.game.models.Continent;
 import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.junit.jupiter.api.Test;
 
@@ -104,10 +107,10 @@ class GameCommandServiceUnitTest {
     private List<PlayerState> players(String firstPlayerId, String secondPlayerId) {
         List<PlayerState> players = new ArrayList<>();
         PlayerState p1 = new PlayerState(firstPlayerId);
-        p1.setCurrentCity("Vienna");
+        p1.setCurrentCity(new City("vienna", "Vienna", Continent.EUROPE, CityColor.RED));
         players.add(p1);
         PlayerState p2 = new PlayerState(secondPlayerId);
-        p2.setCurrentCity("Paris");
+        p2.setCurrentCity(new City("paris", "Paris", Continent.EUROPE, CityColor.BLUE));
         players.add(p2);
         return players;
     }

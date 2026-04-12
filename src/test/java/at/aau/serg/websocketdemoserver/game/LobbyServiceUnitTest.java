@@ -11,7 +11,7 @@ class LobbyServiceUnitTest {
 
     @Test
     void joinLobbyCreatesNewLobbyAndAddsPlayer() {
-        LobbyService service = new LobbyService(new InMemoryLobbyStore());
+        LobbyService service = new LobbyService(new InMemoryLobbyStore(), new CityDistributor());
 
         GameRoomState state = service.joinLobby("lobby-1", "player-1");
 
@@ -24,7 +24,7 @@ class LobbyServiceUnitTest {
 
     @Test
     void joinLobbyRejectsDuplicatePlayer() {
-        LobbyService service = new LobbyService(new InMemoryLobbyStore());
+        LobbyService service = new LobbyService(new InMemoryLobbyStore(), new CityDistributor());
         service.joinLobby("lobby-1", "player-1");
 
         assertThatThrownBy(() -> service.joinLobby("lobby-1", "player-1"))
@@ -34,7 +34,7 @@ class LobbyServiceUnitTest {
 
     @Test
     void startGameSetsInTurnPhaseAndCurrentPlayer() {
-        LobbyService service = new LobbyService(new InMemoryLobbyStore());
+        LobbyService service = new LobbyService(new InMemoryLobbyStore(), new CityDistributor());
         service.joinLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
 
@@ -48,7 +48,7 @@ class LobbyServiceUnitTest {
 
     @Test
     void startGameRejectsLobbyWithLessThanTwoPlayers() {
-        LobbyService service = new LobbyService(new InMemoryLobbyStore());
+        LobbyService service = new LobbyService(new InMemoryLobbyStore(), new CityDistributor());
         service.joinLobby("lobby-1", "player-1");
 
         assertThatThrownBy(() -> service.startGame("lobby-1"))
@@ -58,7 +58,7 @@ class LobbyServiceUnitTest {
 
     @Test
     void leaveLobbyRemovesCurrentPlayerAndRotatesTurn() {
-        LobbyService service = new LobbyService(new InMemoryLobbyStore());
+        LobbyService service = new LobbyService(new InMemoryLobbyStore(), new CityDistributor());
         service.joinLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
         GameRoomState started = service.startGame("lobby-1");
@@ -76,7 +76,7 @@ class LobbyServiceUnitTest {
     @Test
     void leaveLobbyRemovesLobbyWhenLastPlayerLeaves() {
         InMemoryLobbyStore store = new InMemoryLobbyStore();
-        LobbyService service = new LobbyService(store);
+        LobbyService service = new LobbyService(store, new CityDistributor());
         service.joinLobby("lobby-1", "player-1");
 
         service.leaveLobby("lobby-1", "player-1");

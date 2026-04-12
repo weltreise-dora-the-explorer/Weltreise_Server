@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import at.aau.serg.websocketdemoserver.game.models.PlayerState;
+
 import java.util.ArrayList;
 import java.util.List;
 

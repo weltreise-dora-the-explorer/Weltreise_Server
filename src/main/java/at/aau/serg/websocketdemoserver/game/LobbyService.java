@@ -2,7 +2,7 @@ package at.aau.serg.websocketdemoserver.game;
 
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
-import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerState;
+import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -29,7 +29,7 @@ public class LobbyService {
             throw new IllegalArgumentException("Player already joined lobby");
         }
 
-        state.getPlayers().add(new PlayerState(playerId, null, 0));
+        state.getPlayers().add(new PlayerState(playerId));
         state.setVersion(state.getVersion() + 1);
         return state;
     }

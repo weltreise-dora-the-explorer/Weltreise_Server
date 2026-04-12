@@ -4,7 +4,7 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
-import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerState;
+import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -103,8 +103,12 @@ class GameCommandServiceUnitTest {
 
     private List<PlayerState> players(String firstPlayerId, String secondPlayerId) {
         List<PlayerState> players = new ArrayList<>();
-        players.add(new PlayerState(firstPlayerId, "Vienna", 0));
-        players.add(new PlayerState(secondPlayerId, "Paris", 0));
+        PlayerState p1 = new PlayerState(firstPlayerId);
+        p1.setCurrentCity("Vienna");
+        players.add(p1);
+        PlayerState p2 = new PlayerState(secondPlayerId);
+        p2.setCurrentCity("Paris");
+        players.add(p2);
         return players;
     }
 

@@ -4,7 +4,7 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
-import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerState;
+import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

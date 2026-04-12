@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 
+/**
+ * Service für das Verarbeiten von Spieler-Zügen, wie Würfeln und Figur bewegen.
+ */
 @Service
 public class GameCommandService {
     private final Random random;

@@ -7,6 +7,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * In-Memory-Speicher (Map) zur Verwaltung aller aktiven GameRoomStates (Lobbys).
+ */
 @Component
 public class InMemoryLobbyStore {
     private final Map<String, GameRoomState> lobbies = new ConcurrentHashMap<>();

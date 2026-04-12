@@ -8,6 +8,9 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Service für das Verwalten der Spieler-Lobbys (Beitreten, Verlassen, Starten des Spiels).
+ */
 @Service
 public class LobbyService {
     private static final int MIN_PLAYERS_TO_START = 2;

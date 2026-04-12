@@ -2,6 +2,9 @@ package at.aau.serg.websocketdemoserver.websocket.handler;
 
 import org.springframework.web.socket.*;
 
+/**
+ * Standard-Handler für reine WebSockets ohne STOMP (wird primär für einfache Demos verwendet).
+ */
 public class WebSocketHandlerImpl implements WebSocketHandler {
 
 

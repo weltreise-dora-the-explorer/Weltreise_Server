@@ -1,5 +1,9 @@
 package at.aau.serg.websocketdemoserver.messaging.dtos;
 
+import at.aau.serg.websocketdemoserver.game.models.City;
+import at.aau.serg.websocketdemoserver.game.models.CityColor;
+import at.aau.serg.websocketdemoserver.game.models.Continent;
+import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -46,17 +50,23 @@ class TurnBasedDtosUnitTest {
 
     @Test
     void playerStateStoresProvidedValues() {
-        PlayerState playerState = new PlayerState("player-1", "Vienna", 12);
+        City vienna = new City("vienna", "Vienna", Continent.EUROPE, CityColor.RED);
+        PlayerState playerState = new PlayerState("player-1");
+        playerState.setCurrentCity(vienna);
+        playerState.setBoardPosition(12);
 
         assertThat(playerState.getPlayerId()).isEqualTo("player-1");
-        assertThat(playerState.getAssignedCity()).isEqualTo("Vienna");
+        assertThat(playerState.getCurrentCity()).isEqualTo(vienna);
         assertThat(playerState.getBoardPosition()).isEqualTo(12);
     }
 
     @Test
     void gameRoomStateStoresProvidedValues() {
         List<PlayerState> players = new ArrayList<>();
-        players.add(new PlayerState("player-1", "Vienna", 2));
+        PlayerState p1 = new PlayerState("player-1");
+        p1.setCurrentCity(new City("vienna", "Vienna", Continent.EUROPE, CityColor.RED));
+        p1.setBoardPosition(2);
+        players.add(p1);
 
         GameRoomState roomState = new GameRoomState(
                 "lobby-1",

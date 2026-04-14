@@ -30,6 +30,39 @@ class WebSocketBrokerControllerUnitTest {
     private InMemoryLobbyStore lobbyStore;
 
     @Test
+    void handleLobbyCommandRoutesCreateLobbyAndReturnsSuccessResponse() {
+        WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
+        ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null);
+        GameRoomState state = new GameRoomState();
+        state.setLobbyId("lobby-1");
+
+        when(lobbyService.createLobby("lobby-1", "host-player")).thenReturn(state);
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command);
+
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getLobbyId()).isEqualTo("lobby-1");
+        assertThat(response.getCommandType()).isEqualTo(CommandType.CREATE_LOBBY);
+        assertThat(response.getState()).isEqualTo(state);
+        verify(lobbyService).createLobby("lobby-1", "host-player");
+    }
+
+    @Test
+    void handleLobbyCommandReturnsErrorWhenLobbyAlreadyExists() {
+        WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
+        ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null);
+
+        doThrow(new IllegalArgumentException("Lobby already exists"))
+                .when(lobbyService).createLobby("lobby-1", "host-player");
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command);
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getMessage()).contains("already exists");
+        assertThat(response.getCommandType()).isEqualTo(CommandType.CREATE_LOBBY);
+    }
+
+    @Test
     void handleLobbyCommandRoutesJoinAndReturnsSuccessResponse() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
         ClientCommand command = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-1", null);
@@ -45,6 +78,21 @@ class WebSocketBrokerControllerUnitTest {
         assertThat(response.getCommandType()).isEqualTo(CommandType.JOIN_LOBBY);
         assertThat(response.getState()).isEqualTo(state);
         verify(lobbyService).joinLobby("lobby-1", "player-1");
+    }
+
+    @Test
+    void handleLobbyCommandReturnsErrorWhenLobbyDoesNotExist() {
+        WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
+        ClientCommand command = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-1", null);
+
+        doThrow(new IllegalArgumentException("Lobby does not exist"))
+                .when(lobbyService).joinLobby("lobby-1", "player-1");
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command);
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getMessage()).contains("does not exist");
+        assertThat(response.getCommandType()).isEqualTo(CommandType.JOIN_LOBBY);
     }
 
     @Test

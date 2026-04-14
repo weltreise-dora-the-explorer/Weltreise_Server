@@ -37,8 +37,8 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-2", null)
-        )).isInstanceOf(IllegalArgumentException.class)
+                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-2", null)))
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Not your turn");
     }
 
@@ -49,8 +49,8 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3)
-        )).isInstanceOf(IllegalArgumentException.class)
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3)))
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Roll dice before moving");
     }
 
@@ -62,8 +62,8 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 2)
-        )).isInstanceOf(IllegalArgumentException.class)
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 2)))
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Move steps must match dice value");
     }
 
@@ -90,8 +90,8 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-2", 2)
-        )).isInstanceOf(IllegalArgumentException.class)
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-2", 2)))
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Not your turn");
     }
 

@@ -27,9 +27,22 @@ public class LobbyService {
         this.cityDistributor = Objects.requireNonNull(cityDistributor, "cityDistributor must not be null");
     }
 
+    public GameRoomState createLobby(String lobbyId, String playerId) {
+        if (lobbyStore.get(lobbyId).isPresent()) {
+            throw new IllegalArgumentException("Lobby already exists");
+        }
+        GameRoomState newLobby = new GameRoomState();
+        newLobby.setLobbyId(lobbyId);
+        newLobby.getPlayers().add(new PlayerState(playerId));
+        lobbyStore.put(lobbyId, newLobby);
+        return newLobby;
+    }
+
     public GameRoomState joinLobby(String lobbyId, String playerId) {
         validatePlayerId(playerId);
-        GameRoomState state = lobbyStore.getOrCreate(lobbyId);
+        GameRoomState state = lobbyStore.get(lobbyId).orElseThrow(() -> 
+            new IllegalArgumentException("Lobby does not exist. Please check the Game PIN!")
+        );
 
         if (state.getPhase() != GamePhase.LOBBY) {
             throw new IllegalArgumentException("Cannot join started game");

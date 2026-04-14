@@ -16,6 +16,7 @@ class TurnBasedDtosUnitTest {
     @Test
     void commandTypeContainsExpectedValues() {
         assertThat(CommandType.values()).containsExactly(
+                CommandType.CREATE_LOBBY,
                 CommandType.JOIN_LOBBY,
                 CommandType.START_GAME,
                 CommandType.ROLL_DICE,

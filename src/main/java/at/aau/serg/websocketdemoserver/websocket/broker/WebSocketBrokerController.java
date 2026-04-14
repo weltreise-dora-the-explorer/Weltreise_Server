@@ -57,6 +57,7 @@ public class WebSocketBrokerController {
             command.setLobbyId(lobbyId);
 
             GameRoomState state = switch (commandType) {
+                case CREATE_LOBBY -> lobbyService.createLobby(lobbyId, command.getPlayerId());
                 case JOIN_LOBBY -> lobbyService.joinLobby(lobbyId, command.getPlayerId());
                 case LEAVE_LOBBY -> lobbyService.leaveLobby(lobbyId, command.getPlayerId());
                 case START_GAME -> lobbyService.startGame(lobbyId);

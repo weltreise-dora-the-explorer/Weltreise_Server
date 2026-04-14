@@ -23,6 +23,11 @@ public class InMemoryLobbyStore {
         });
     }
 
+    public void put(String lobbyId, GameRoomState state) {
+        validateLobbyId(lobbyId);
+        lobbies.put(lobbyId, state);
+    }
+
     public Optional<GameRoomState> get(String lobbyId) {
         validateLobbyId(lobbyId);
         return Optional.ofNullable(lobbies.get(lobbyId));

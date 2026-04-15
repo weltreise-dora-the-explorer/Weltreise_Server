@@ -1,11 +1,13 @@
 package at.aau.serg.websocketdemoserver.websocket.broker;
 
 import at.aau.serg.websocketdemoserver.game.GameCommandService;
+import at.aau.serg.websocketdemoserver.game.GameException;
 import at.aau.serg.websocketdemoserver.game.InMemoryLobbyStore;
 import at.aau.serg.websocketdemoserver.game.LobbyService;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
+import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import at.aau.serg.websocketdemoserver.messaging.dtos.StompMessage;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -52,7 +54,7 @@ public class WebSocketBrokerController {
         CommandType commandType = command != null ? command.getType() : null;
         try {
             if (command == null || commandType == null) {
-                throw new IllegalArgumentException("Command type is required");
+                throw new GameException(ErrorCode.MISSING_COMMAND_TYPE, "Command type is required");
             }
             command.setLobbyId(lobbyId);
 
@@ -63,15 +65,17 @@ public class WebSocketBrokerController {
                 case START_GAME -> lobbyService.startGame(lobbyId);
                 case ROLL_DICE, MOVE_TOKEN -> {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
-                            .orElseThrow(() -> new IllegalArgumentException("Lobby not found"));
+                            .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
                     gameCommandService.processCommand(existingState, command);
                     yield existingState;
                 }
             };
 
-            return new CommandResponse(true, "OK", lobbyId, commandType, state);
-        } catch (IllegalArgumentException ex) {
-            return new CommandResponse(false, ex.getMessage(), lobbyId, commandType, null);
+            return new CommandResponse(true, "OK", null, lobbyId, commandType, state);
+        } catch (GameException ex) {
+            return new CommandResponse(false, ex.getMessage(), ex.getErrorCode(), lobbyId, commandType, null);
+        } catch (Exception ex) {
+            return new CommandResponse(false, "Internal server error", ErrorCode.INTERNAL_ERROR, lobbyId, commandType, null);
         }
     }
 

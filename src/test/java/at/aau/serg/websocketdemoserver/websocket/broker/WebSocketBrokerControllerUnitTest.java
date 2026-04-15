@@ -1,11 +1,13 @@
 package at.aau.serg.websocketdemoserver.websocket.broker;
 
 import at.aau.serg.websocketdemoserver.game.GameCommandService;
+import at.aau.serg.websocketdemoserver.game.GameException;
 import at.aau.serg.websocketdemoserver.game.InMemoryLobbyStore;
 import at.aau.serg.websocketdemoserver.game.LobbyService;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
+import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,6 +78,7 @@ class WebSocketBrokerControllerUnitTest {
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.getLobbyId()).isEqualTo("lobby-1");
         assertThat(response.getCommandType()).isEqualTo(CommandType.JOIN_LOBBY);
+        assertThat(response.getErrorCode()).isNull();
         assertThat(response.getState()).isEqualTo(state);
         verify(lobbyService).joinLobby("lobby-1", "player-1");
     }
@@ -106,6 +109,7 @@ class WebSocketBrokerControllerUnitTest {
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.getCommandType()).isEqualTo(CommandType.ROLL_DICE);
+        assertThat(response.getErrorCode()).isNull();
         assertThat(response.getState()).isEqualTo(state);
         verify(gameCommandService).processCommand(state, command);
     }
@@ -114,13 +118,14 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandReturnsErrorResponseOnValidationFailure() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
         ClientCommand command = new ClientCommand(CommandType.START_GAME, null, "player-1", null);
-        doThrow(new IllegalArgumentException("At least two players are required"))
+        doThrow(new GameException(ErrorCode.MIN_PLAYERS_NOT_REACHED, "At least two players are required"))
                 .when(lobbyService).startGame("lobby-1");
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command);
 
         assertThat(response.isSuccess()).isFalse();
         assertThat(response.getMessage()).contains("At least two players");
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.MIN_PLAYERS_NOT_REACHED);
         assertThat(response.getCommandType()).isEqualTo(CommandType.START_GAME);
         assertThat(response.getState()).isNull();
     }
@@ -134,6 +139,7 @@ class WebSocketBrokerControllerUnitTest {
 
         assertThat(response.isSuccess()).isFalse();
         assertThat(response.getMessage()).contains("Command type is required");
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.MISSING_COMMAND_TYPE);
         assertThat(response.getCommandType()).isNull();
     }
 }

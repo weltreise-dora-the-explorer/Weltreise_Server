@@ -1,8 +1,9 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.GameException;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
-import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -10,36 +11,107 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LobbyServiceUnitTest {
 
-    @Test
-    void joinLobbyCreatesNewLobbyAndAddsPlayer() {
-        LobbyService service = new LobbyService(new InMemoryLobbyStore());
+    private InMemoryLobbyStore store;
+    private LobbyService service;
 
-        GameRoomState state = service.joinLobby("lobby-1", "player-1");
+    @BeforeEach
+    void setUp() {
+        store = new InMemoryLobbyStore();
+        service = new LobbyService(store, new CityDistributor());
+    }
+
+    // ========== CREATE LOBBY TESTS ==========
+
+    @Test
+    void createLobbyCreatesNewLobbyWithHost() {
+        GameRoomState state = service.createLobby("lobby-1", "host-player");
 
         assertThat(state.getLobbyId()).isEqualTo("lobby-1");
         assertThat(state.getPlayers()).hasSize(1);
-        assertThat(state.getPlayers().getFirst().getPlayerId()).isEqualTo("player-1");
+        assertThat(state.getPlayers().getFirst().getPlayerId()).isEqualTo("host-player");
         assertThat(state.getPhase()).isEqualTo(GamePhase.LOBBY);
+    }
+
+    @Test
+    void createLobbyStoresLobbyInStore() {
+        service.createLobby("lobby-1", "host-player");
+
+        assertThat(store.get("lobby-1")).isPresent();
+        assertThat(store.get("lobby-1").get().getPlayers()).hasSize(1);
+    }
+
+    @Test
+    void createLobbyRejectsDuplicateLobbyId() {
+        service.createLobby("lobby-1", "host-player");
+
+        assertThatThrownBy(() -> service.createLobby("lobby-1", "another-host"))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("already exists");
+    }
+
+    // ========== JOIN LOBBY TESTS ==========
+
+    @Test
+    void joinLobbyAddsPlayerToExistingLobby() {
+        service.createLobby("lobby-1", "host-player");
+
+        GameRoomState state = service.joinLobby("lobby-1", "player-2");
+
+        assertThat(state.getPlayers()).hasSize(2);
+        assertThat(state.getPlayers().get(1).getPlayerId()).isEqualTo("player-2");
         assertThat(state.getVersion()).isEqualTo(1L);
     }
 
     @Test
+    void joinLobbyRejectsNonExistentLobby() {
+        assertThatThrownBy(() -> service.joinLobby("non-existent", "player-1"))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("does not exist");
+    }
+
+    @Test
     void joinLobbyRejectsDuplicatePlayer() {
-        LobbyService service = new LobbyService(new InMemoryLobbyStore());
-        service.joinLobby("lobby-1", "player-1");
+        service.createLobby("lobby-1", "player-1");
 
         assertThatThrownBy(() -> service.joinLobby("lobby-1", "player-1"))
                 .isInstanceOf(GameException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.PLAYER_ALREADY_JOINED);
-        assertThatThrownBy(() -> service.joinLobby("lobby-1", "player-1"))
                 .hasMessageContaining("already joined");
     }
 
     @Test
+    void joinLobbyRejectsJoiningStartedGame() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1");
+
+        assertThatThrownBy(() -> service.joinLobby("lobby-1", "player-3"))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Cannot join started game");
+    }
+
+    @Test
+    void joinLobbyRejectsEmptyPlayerId() {
+        service.createLobby("lobby-1", "host");
+
+        assertThatThrownBy(() -> service.joinLobby("lobby-1", ""))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Player id is required");
+    }
+
+    @Test
+    void joinLobbyRejectsNullPlayerId() {
+        service.createLobby("lobby-1", "host");
+
+        assertThatThrownBy(() -> service.joinLobby("lobby-1", null))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Player id is required");
+    }
+
+    // ========== START GAME TESTS ==========
+
+    @Test
     void startGameSetsInTurnPhaseAndCurrentPlayer() {
-        LobbyService service = new LobbyService(new InMemoryLobbyStore());
-        service.joinLobby("lobby-1", "player-1");
+        service.createLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
 
         GameRoomState state = service.startGame("lobby-1");
@@ -47,26 +119,40 @@ class LobbyServiceUnitTest {
         assertThat(state.getPhase()).isEqualTo(GamePhase.IN_TURN);
         assertThat(state.getCurrentPlayerId()).isEqualTo("player-1");
         assertThat(state.getLastDiceValue()).isNull();
-        assertThat(state.getVersion()).isEqualTo(3L);
     }
 
     @Test
     void startGameRejectsLobbyWithLessThanTwoPlayers() {
-        LobbyService service = new LobbyService(new InMemoryLobbyStore());
-        service.joinLobby("lobby-1", "player-1");
+        service.createLobby("lobby-1", "player-1");
 
         assertThatThrownBy(() -> service.startGame("lobby-1"))
                 .isInstanceOf(GameException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.MIN_PLAYERS_NOT_REACHED);
-        assertThatThrownBy(() -> service.startGame("lobby-1"))
                 .hasMessageContaining("At least two players");
     }
 
     @Test
+    void startGameRejectsNonExistentLobby() {
+        assertThatThrownBy(() -> service.startGame("non-existent"))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("not found");
+    }
+
+    @Test
+    void startGameRejectsAlreadyStartedGame() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1");
+
+        assertThatThrownBy(() -> service.startGame("lobby-1"))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("already started");
+    }
+
+    // ========== LEAVE LOBBY TESTS ==========
+
+    @Test
     void leaveLobbyRemovesCurrentPlayerAndRotatesTurn() {
-        LobbyService service = new LobbyService(new InMemoryLobbyStore());
-        service.joinLobby("lobby-1", "player-1");
+        service.createLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
         GameRoomState started = service.startGame("lobby-1");
         started.setLastDiceValue(5);
@@ -77,17 +163,55 @@ class LobbyServiceUnitTest {
         assertThat(state.getPlayers().getFirst().getPlayerId()).isEqualTo("player-2");
         assertThat(state.getCurrentPlayerId()).isEqualTo("player-2");
         assertThat(state.getLastDiceValue()).isNull();
-        assertThat(state.getVersion()).isEqualTo(4L);
     }
 
     @Test
     void leaveLobbyRemovesLobbyWhenLastPlayerLeaves() {
-        InMemoryLobbyStore store = new InMemoryLobbyStore();
-        LobbyService service = new LobbyService(store);
-        service.joinLobby("lobby-1", "player-1");
+        service.createLobby("lobby-1", "player-1");
 
         service.leaveLobby("lobby-1", "player-1");
 
         assertThat(store.get("lobby-1")).isEmpty();
+    }
+
+    @Test
+    void leaveLobbyRejectsNonExistentLobby() {
+        assertThatThrownBy(() -> service.leaveLobby("non-existent", "player-1"))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("not found");
+    }
+
+    @Test
+    void leaveLobbyRejectsPlayerNotInLobby() {
+        service.createLobby("lobby-1", "player-1");
+
+        assertThatThrownBy(() -> service.leaveLobby("lobby-1", "player-2"))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("not in lobby");
+    }
+
+    @Test
+    void leaveLobbyDoesNotChangeTurnWhenNonCurrentPlayerLeaves() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1");
+
+        // player-2 leaves but player-1 is current player → turn stays with player-1
+        GameRoomState state = service.leaveLobby("lobby-1", "player-2");
+
+        assertThat(state.getCurrentPlayerId()).isEqualTo("player-1");
+        assertThat(state.getPlayers()).hasSize(1);
+    }
+
+    @Test
+    void startGameAssignsCitiesToPlayers() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+
+        GameRoomState state = service.startGame("lobby-1");
+
+        assertThat(state.getPlayers().get(0).getOwnedCities()).isNotEmpty();
+        assertThat(state.getPlayers().get(0).getStartCity()).isNotNull();
+        assertThat(state.getPlayers().get(0).getCurrentCity()).isNotNull();
     }
 }

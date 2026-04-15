@@ -5,13 +5,16 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
-import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerState;
+import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 
+/**
+ * Service für das Verarbeiten von Spieler-Zügen, wie Würfeln und Figur bewegen.
+ */
 @Service
 public class GameCommandService {
     private final Random random;

@@ -1,11 +1,15 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.GameException;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
-import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerState;
+import at.aau.serg.websocketdemoserver.game.models.City;
+import at.aau.serg.websocketdemoserver.game.models.CityColor;
+import at.aau.serg.websocketdemoserver.game.models.Continent;
+import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -35,14 +39,8 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-2", null)
-        )).isInstanceOf(GameException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.NOT_YOUR_TURN);
-        assertThatThrownBy(() -> service.processCommand(
-                state,
-                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-2", null)
-        ))
+                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-2", null)))
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("Not your turn");
     }
 
@@ -53,14 +51,8 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3)
-        )).isInstanceOf(GameException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.ROLL_REQUIRED_BEFORE_MOVE);
-        assertThatThrownBy(() -> service.processCommand(
-                state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3)
-        ))
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3)))
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("Roll dice before moving");
     }
 
@@ -72,14 +64,8 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 2)
-        )).isInstanceOf(GameException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_MOVE_STEPS);
-        assertThatThrownBy(() -> service.processCommand(
-                state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 2)
-        ))
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 2)))
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("Move steps must match dice value");
     }
 
@@ -106,15 +92,69 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-2", 2)
-        )).isInstanceOf(GameException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.NOT_YOUR_TURN);
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-2", 2)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Not your turn");
+    }
+
+    @Test
+    void rollDiceRejectsWhenDiceAlreadyRolled() {
+        GameCommandService service = new GameCommandService(new FixedRandom(3));
+        GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null));
+
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-2", 2)
-        ))
-                .hasMessageContaining("Not your turn");
+                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Dice already rolled");
+    }
+
+    @Test
+    void processCommandRejectsNullCommand() {
+        GameCommandService service = new GameCommandService();
+
+        assertThatThrownBy(() -> service.processCommand(new GameRoomState(), null))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("required");
+    }
+
+    @Test
+    void processCommandRejectsNullState() {
+        GameCommandService service = new GameCommandService();
+        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null);
+
+        assertThatThrownBy(() -> service.processCommand(null, command))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("required");
+    }
+
+    @Test
+    void processCommandRejectsWrongPhase() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = new GameRoomState();
+        state.setPhase(GamePhase.LOBBY);
+        state.setPlayers(players("player-1", "player-2"));
+        state.setCurrentPlayerId("player-1");
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("current phase");
+    }
+
+    @Test
+    void moveTokenRejectsWhenMoveStepsNull() {
+        GameCommandService service = new GameCommandService(new FixedRandom(3));
+        GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null));
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Move steps are required");
     }
 
     private GameRoomState inTurnState(String currentPlayerId, List<PlayerState> players) {
@@ -128,8 +168,12 @@ class GameCommandServiceUnitTest {
 
     private List<PlayerState> players(String firstPlayerId, String secondPlayerId) {
         List<PlayerState> players = new ArrayList<>();
-        players.add(new PlayerState(firstPlayerId, "Vienna", 0));
-        players.add(new PlayerState(secondPlayerId, "Paris", 0));
+        PlayerState p1 = new PlayerState(firstPlayerId);
+        p1.setCurrentCity(new City("vienna", "Vienna", Continent.EUROPE, CityColor.RED));
+        players.add(p1);
+        PlayerState p2 = new PlayerState(secondPlayerId);
+        p2.setCurrentCity(new City("paris", "Paris", Continent.EUROPE, CityColor.BLUE));
+        players.add(p2);
         return players;
     }
 

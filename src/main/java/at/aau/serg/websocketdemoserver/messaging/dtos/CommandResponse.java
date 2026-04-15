@@ -5,6 +5,9 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
+/**
+ * DTO für Antworten des Servers auf Client-Kommandos (inklusive Fehlermeldungen etc.).
+ */
 public class CommandResponse {
     private boolean success;
     private String message;

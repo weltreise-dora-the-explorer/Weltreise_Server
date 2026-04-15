@@ -5,6 +5,9 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
+/**
+ * DTO für allgemeine STOMP-Nachrichten (Text-basierte Kommunikation).
+ */
 public class StompMessage {
 
         private String from;

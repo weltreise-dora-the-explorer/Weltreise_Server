@@ -4,9 +4,15 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import at.aau.serg.websocketdemoserver.game.models.PlayerState;
+
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * DTO und In-Memory-Zustand eines konkreten Spiels/einer Lobby.
+ * Enthält Spieler, aktuelle Phase, Würfelergebnis sowie eine Versionierung für UI-Updates.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

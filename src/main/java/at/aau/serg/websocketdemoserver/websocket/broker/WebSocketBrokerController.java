@@ -17,6 +17,10 @@ import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.stereotype.Controller;
 
 
+/**
+ * Controller-Klasse, die eingehende WebSocket-Kommandos entgegennimmt und
+ * diese zur Ausführung an die entsprechenden Services weiterleitet.
+ */
 @Controller
 public class WebSocketBrokerController {
     private final LobbyService lobbyService;
@@ -55,6 +59,7 @@ public class WebSocketBrokerController {
             command.setLobbyId(lobbyId);
 
             GameRoomState state = switch (commandType) {
+                case CREATE_LOBBY -> lobbyService.createLobby(lobbyId, command.getPlayerId());
                 case JOIN_LOBBY -> lobbyService.joinLobby(lobbyId, command.getPlayerId());
                 case LEAVE_LOBBY -> lobbyService.leaveLobby(lobbyId, command.getPlayerId());
                 case START_GAME -> lobbyService.startGame(lobbyId);

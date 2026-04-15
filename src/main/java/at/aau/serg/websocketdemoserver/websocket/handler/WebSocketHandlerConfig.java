@@ -5,6 +5,9 @@ import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 
+/**
+ * Konfiguration für einfache WebSocket-Handler ohne STOMP.
+ */
 @Configuration
 @EnableWebSocket
 public class WebSocketHandlerConfig implements WebSocketConfigurer {

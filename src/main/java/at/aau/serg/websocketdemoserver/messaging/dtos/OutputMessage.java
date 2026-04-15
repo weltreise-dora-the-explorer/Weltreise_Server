@@ -1,6 +1,9 @@
 package at.aau.serg.websocketdemoserver.messaging.dtos;
 
 
+/**
+ * DTO für abgehende Nachrichten über reine WebSockets.
+ */
 public class OutputMessage {
 
     private String from;

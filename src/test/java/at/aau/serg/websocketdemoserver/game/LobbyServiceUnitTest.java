@@ -189,4 +189,29 @@ class LobbyServiceUnitTest {
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("not in lobby");
     }
+
+    @Test
+    void leaveLobbyDoesNotChangeTurnWhenNonCurrentPlayerLeaves() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1");
+
+        // player-2 leaves but player-1 is current player → turn stays with player-1
+        GameRoomState state = service.leaveLobby("lobby-1", "player-2");
+
+        assertThat(state.getCurrentPlayerId()).isEqualTo("player-1");
+        assertThat(state.getPlayers()).hasSize(1);
+    }
+
+    @Test
+    void startGameAssignsCitiesToPlayers() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+
+        GameRoomState state = service.startGame("lobby-1");
+
+        assertThat(state.getPlayers().get(0).getOwnedCities()).isNotEmpty();
+        assertThat(state.getPlayers().get(0).getStartCity()).isNotNull();
+        assertThat(state.getPlayers().get(0).getCurrentCity()).isNotNull();
+    }
 }

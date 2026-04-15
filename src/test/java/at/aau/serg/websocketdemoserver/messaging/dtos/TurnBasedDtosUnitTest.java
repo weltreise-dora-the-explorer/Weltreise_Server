@@ -95,4 +95,21 @@ class TurnBasedDtosUnitTest {
         assertThat(roomState.getPhase()).isEqualTo(GamePhase.LOBBY);
         assertThat(roomState.getVersion()).isEqualTo(0L);
     }
+
+    @Test
+    void playerStateIsAllTargetsReachedReturnsFalseWhenNoCitiesAssigned() {
+        PlayerState player = new PlayerState("player-1");
+
+        assertThat(player.isAllTargetsReached()).isFalse();
+    }
+
+    @Test
+    void playerStateIsAllTargetsReachedReturnsTrueWhenAllVisited() {
+        City vienna = new City("vienna", "Vienna", Continent.EUROPE, CityColor.RED);
+        PlayerState player = new PlayerState("player-1");
+        player.getOwnedCities().add(vienna);
+        player.getVisitedCities().add(vienna);
+
+        assertThat(player.isAllTargetsReached()).isTrue();
+    }
 }

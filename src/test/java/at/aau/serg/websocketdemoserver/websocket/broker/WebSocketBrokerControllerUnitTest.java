@@ -158,4 +158,27 @@ class WebSocketBrokerControllerUnitTest {
         assertThat(response.getMessage()).isEqualTo("Internal server error");
         assertThat(response.getErrorCode()).isEqualTo(ErrorCode.INTERNAL_ERROR);
     }
+
+    @Test
+    void handleLobbyCommandReturnsErrorWhenCommandIsNull() {
+        WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", null);
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getMessage()).contains("Command type is required");
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.MISSING_COMMAND_TYPE);
+    }
+
+    @Test
+    void handleLobbyCommandReturnsErrorWhenLobbyNotFoundForRollDice() {
+        WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
+        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null);
+        when(lobbyStore.get("lobby-1")).thenReturn(java.util.Optional.empty());
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command);
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.LOBBY_NOT_FOUND);
+    }
 }

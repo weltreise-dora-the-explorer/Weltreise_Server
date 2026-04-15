@@ -12,6 +12,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.messaging.converter.JacksonJsonMessageConverter;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class LobbyCommandFlowIntegrationTest {
 
     @LocalServerPort
@@ -38,12 +40,12 @@ class LobbyCommandFlowIntegrationTest {
         StompSession session = initSession("/topic/lobby/" + lobbyId + "/events", messages);
 
         session.send("/app/lobby/" + lobbyId + "/command",
-                new ClientCommand(CommandType.JOIN_LOBBY, null, "player-1", null));
-        CommandResponse joinOne = messages.poll(1, TimeUnit.SECONDS);
-        assertThat(joinOne).isNotNull();
-        assertThat(joinOne.isSuccess()).isTrue();
-        assertThat(joinOne.getCommandType()).isEqualTo(CommandType.JOIN_LOBBY);
-        assertThat(joinOne.getState().getPlayers()).hasSize(1);
+                new ClientCommand(CommandType.CREATE_LOBBY, null, "player-1", null));
+        CommandResponse create = messages.poll(1, TimeUnit.SECONDS);
+        assertThat(create).isNotNull();
+        assertThat(create.isSuccess()).isTrue();
+        assertThat(create.getCommandType()).isEqualTo(CommandType.CREATE_LOBBY);
+        assertThat(create.getState().getPlayers()).hasSize(1);
 
         session.send("/app/lobby/" + lobbyId + "/command",
                 new ClientCommand(CommandType.JOIN_LOBBY, null, "player-2", null));

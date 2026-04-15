@@ -81,6 +81,7 @@ class WebSocketBrokerControllerUnitTest {
         assertThat(response.getErrorCode()).isNull();
         assertThat(response.getLobbyId()).isEqualTo("lobby-1");
         assertThat(response.getCommandType()).isEqualTo(CommandType.JOIN_LOBBY);
+        assertThat(response.getErrorCode()).isNull();
         assertThat(response.getState()).isEqualTo(state);
         verify(lobbyService).joinLobby("lobby-1", "player-1");
     }
@@ -112,6 +113,7 @@ class WebSocketBrokerControllerUnitTest {
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.getCommandType()).isEqualTo(CommandType.ROLL_DICE);
+        assertThat(response.getErrorCode()).isNull();
         assertThat(response.getState()).isEqualTo(state);
         verify(gameCommandService).processCommand(state, command);
     }

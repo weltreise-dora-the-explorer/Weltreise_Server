@@ -1,5 +1,6 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.GameException;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +45,7 @@ class LobbyServiceUnitTest {
         service.createLobby("lobby-1", "host-player");
 
         assertThatThrownBy(() -> service.createLobby("lobby-1", "another-host"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("already exists");
     }
 
@@ -64,7 +65,7 @@ class LobbyServiceUnitTest {
     @Test
     void joinLobbyRejectsNonExistentLobby() {
         assertThatThrownBy(() -> service.joinLobby("non-existent", "player-1"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("does not exist");
     }
 
@@ -73,7 +74,7 @@ class LobbyServiceUnitTest {
         service.createLobby("lobby-1", "player-1");
 
         assertThatThrownBy(() -> service.joinLobby("lobby-1", "player-1"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("already joined");
     }
 
@@ -84,7 +85,7 @@ class LobbyServiceUnitTest {
         service.startGame("lobby-1");
 
         assertThatThrownBy(() -> service.joinLobby("lobby-1", "player-3"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("Cannot join started game");
     }
 
@@ -93,7 +94,7 @@ class LobbyServiceUnitTest {
         service.createLobby("lobby-1", "host");
 
         assertThatThrownBy(() -> service.joinLobby("lobby-1", ""))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("Player id is required");
     }
 
@@ -102,7 +103,7 @@ class LobbyServiceUnitTest {
         service.createLobby("lobby-1", "host");
 
         assertThatThrownBy(() -> service.joinLobby("lobby-1", null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("Player id is required");
     }
 
@@ -125,14 +126,14 @@ class LobbyServiceUnitTest {
         service.createLobby("lobby-1", "player-1");
 
         assertThatThrownBy(() -> service.startGame("lobby-1"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("At least two players");
     }
 
     @Test
     void startGameRejectsNonExistentLobby() {
         assertThatThrownBy(() -> service.startGame("non-existent"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("not found");
     }
 
@@ -143,7 +144,7 @@ class LobbyServiceUnitTest {
         service.startGame("lobby-1");
 
         assertThatThrownBy(() -> service.startGame("lobby-1"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("already started");
     }
 
@@ -176,7 +177,7 @@ class LobbyServiceUnitTest {
     @Test
     void leaveLobbyRejectsNonExistentLobby() {
         assertThatThrownBy(() -> service.leaveLobby("non-existent", "player-1"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("not found");
     }
 
@@ -185,7 +186,7 @@ class LobbyServiceUnitTest {
         service.createLobby("lobby-1", "player-1");
 
         assertThatThrownBy(() -> service.leaveLobby("lobby-1", "player-2"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("not in lobby");
     }
 }

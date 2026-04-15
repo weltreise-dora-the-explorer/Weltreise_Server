@@ -1,5 +1,6 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.GameException;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
@@ -38,7 +39,7 @@ class GameCommandServiceUnitTest {
         assertThatThrownBy(() -> service.processCommand(
                 state,
                 new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-2", null)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("Not your turn");
     }
 
@@ -50,7 +51,7 @@ class GameCommandServiceUnitTest {
         assertThatThrownBy(() -> service.processCommand(
                 state,
                 new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("Roll dice before moving");
     }
 
@@ -63,7 +64,7 @@ class GameCommandServiceUnitTest {
         assertThatThrownBy(() -> service.processCommand(
                 state,
                 new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 2)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("Move steps must match dice value");
     }
 
@@ -91,7 +92,7 @@ class GameCommandServiceUnitTest {
         assertThatThrownBy(() -> service.processCommand(
                 state,
                 new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-2", 2)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GameException.class)
                 .hasMessageContaining("Not your turn");
     }
 

@@ -62,7 +62,7 @@ public class WebSocketBrokerController {
                 case CREATE_LOBBY -> lobbyService.createLobby(lobbyId, command.getPlayerId());
                 case JOIN_LOBBY -> lobbyService.joinLobby(lobbyId, command.getPlayerId());
                 case LEAVE_LOBBY -> lobbyService.leaveLobby(lobbyId, command.getPlayerId());
-                case START_GAME -> lobbyService.startGame(lobbyId);
+                case START_GAME -> lobbyService.startGame(lobbyId, command.getStops() != null ? command.getStops() : 12);
                 case ROLL_DICE, MOVE_TOKEN -> {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
                             .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));

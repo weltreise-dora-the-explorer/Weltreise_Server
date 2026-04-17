@@ -26,7 +26,7 @@ class GameCommandServiceUnitTest {
         GameCommandService service = new GameCommandService(new FixedRandom(4));
         GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
 
-        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null));
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
         assertThat(state.getLastDiceValue()).isEqualTo(5);
         assertThat(state.getVersion()).isEqualTo(1L);
@@ -39,7 +39,7 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-2", null)))
+                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-2", null, null)))
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("Not your turn");
     }
@@ -51,7 +51,7 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3)))
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3, null)))
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("Roll dice before moving");
     }
@@ -60,11 +60,11 @@ class GameCommandServiceUnitTest {
     void moveTokenRejectsWhenStepsDoNotMatchDiceValue() {
         GameCommandService service = new GameCommandService(new FixedRandom(3));
         GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
-        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null));
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 2)))
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 2, null)))
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("Move steps must match dice value");
     }
@@ -74,9 +74,9 @@ class GameCommandServiceUnitTest {
         GameCommandService service = new GameCommandService(new FixedRandom(2));
         List<PlayerState> players = players("player-1", "player-2");
         GameRoomState state = inTurnState("player-1", players);
-        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null));
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
-        service.processCommand(state, new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3));
+        service.processCommand(state, new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3, null));
 
         assertThat(players.get(0).getBoardPosition()).isEqualTo(3);
         assertThat(state.getCurrentPlayerId()).isEqualTo("player-2");
@@ -88,11 +88,11 @@ class GameCommandServiceUnitTest {
     void moveTokenRejectsNonActivePlayer() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
         GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
-        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null));
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-2", 2)))
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-2", 2, null)))
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("Not your turn");
     }
@@ -101,11 +101,11 @@ class GameCommandServiceUnitTest {
     void rollDiceRejectsWhenDiceAlreadyRolled() {
         GameCommandService service = new GameCommandService(new FixedRandom(3));
         GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
-        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null));
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null)))
+                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null)))
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("Dice already rolled");
     }
@@ -122,7 +122,7 @@ class GameCommandServiceUnitTest {
     @Test
     void processCommandRejectsNullState() {
         GameCommandService service = new GameCommandService();
-        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null);
+        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null);
 
         assertThatThrownBy(() -> service.processCommand(null, command))
                 .isInstanceOf(GameException.class)
@@ -139,7 +139,7 @@ class GameCommandServiceUnitTest {
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null)))
+                new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null)))
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("current phase");
     }
@@ -148,11 +148,11 @@ class GameCommandServiceUnitTest {
     void moveTokenRejectsWhenMoveStepsNull() {
         GameCommandService service = new GameCommandService(new FixedRandom(3));
         GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
-        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null));
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", null)))
+                new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", null, null)))
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("Move steps are required");
     }

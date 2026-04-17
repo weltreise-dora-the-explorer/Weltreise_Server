@@ -40,7 +40,8 @@ class TurnBasedDtosUnitTest {
                 CommandType.MOVE_TOKEN,
                 "lobby-1",
                 "player-1",
-                4
+                4,
+                null
         );
 
         assertThat(command.getType()).isEqualTo(CommandType.MOVE_TOKEN);

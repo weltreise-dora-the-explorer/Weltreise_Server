@@ -8,6 +8,7 @@ public enum CityColor {
     BLUE,
     GREEN,
     YELLOW,
+    ORANGE,
     BLACK,
     WHITE
 }

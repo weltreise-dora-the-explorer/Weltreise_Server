@@ -34,7 +34,7 @@ class WebSocketBrokerControllerUnitTest {
     @Test
     void handleLobbyCommandRoutesCreateLobbyAndReturnsSuccessResponse() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
-        ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null);
+        ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null, null);
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");
 
@@ -53,7 +53,7 @@ class WebSocketBrokerControllerUnitTest {
     @Test
     void handleLobbyCommandReturnsErrorWhenLobbyAlreadyExists() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
-        ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null);
+        ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null, null);
 
         doThrow(new GameException(ErrorCode.GAME_ALREADY_STARTED, "Lobby already exists"))
                 .when(lobbyService).createLobby("lobby-1", "host-player");
@@ -69,7 +69,7 @@ class WebSocketBrokerControllerUnitTest {
     @Test
     void handleLobbyCommandRoutesJoinAndReturnsSuccessResponse() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
-        ClientCommand command = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-1", null);
+        ClientCommand command = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-1", null, null);
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");
 
@@ -89,7 +89,7 @@ class WebSocketBrokerControllerUnitTest {
     @Test
     void handleLobbyCommandReturnsErrorWhenLobbyDoesNotExist() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
-        ClientCommand command = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-1", null);
+        ClientCommand command = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-1", null, null);
 
         doThrow(new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby does not exist"))
                 .when(lobbyService).joinLobby("lobby-1", "player-1");
@@ -105,7 +105,7 @@ class WebSocketBrokerControllerUnitTest {
     @Test
     void handleLobbyCommandRoutesRollDiceThroughGameService() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
-        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null);
+        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null, null);
         GameRoomState state = new GameRoomState();
         when(lobbyStore.get("lobby-1")).thenReturn(Optional.of(state));
 
@@ -121,9 +121,9 @@ class WebSocketBrokerControllerUnitTest {
     @Test
     void handleLobbyCommandReturnsErrorResponseOnValidationFailure() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
-        ClientCommand command = new ClientCommand(CommandType.START_GAME, null, "player-1", null);
+        ClientCommand command = new ClientCommand(CommandType.START_GAME, null, "player-1", null, null);
         doThrow(new GameException(ErrorCode.MIN_PLAYERS_NOT_REACHED, "At least two players are required"))
-                .when(lobbyService).startGame("lobby-1");
+                .when(lobbyService).startGame("lobby-1", 12);
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command);
 
@@ -137,7 +137,7 @@ class WebSocketBrokerControllerUnitTest {
     @Test
     void handleLobbyCommandReturnsErrorWhenCommandTypeIsMissing() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
-        ClientCommand command = new ClientCommand(null, null, "player-1", null);
+        ClientCommand command = new ClientCommand(null, null, "player-1", null, null);
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command);
 
@@ -150,9 +150,9 @@ class WebSocketBrokerControllerUnitTest {
     @Test
     void handleLobbyCommandReturnsInternalErrorOnUnexpectedException() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
-        ClientCommand command = new ClientCommand(CommandType.START_GAME, null, "player-1", null);
+        ClientCommand command = new ClientCommand(CommandType.START_GAME, null, "player-1", null, null);
         doThrow(new RuntimeException("unexpected"))
-                .when(lobbyService).startGame("lobby-1");
+                .when(lobbyService).startGame("lobby-1", 12);
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command);
 
@@ -175,7 +175,7 @@ class WebSocketBrokerControllerUnitTest {
     @Test
     void handleLobbyCommandReturnsErrorWhenLobbyNotFoundForRollDice() {
         WebSocketBrokerController controller = new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore);
-        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null);
+        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null, null);
         when(lobbyStore.get("lobby-1")).thenReturn(java.util.Optional.empty());
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command);

@@ -85,7 +85,7 @@ public class LobbyService {
         return state;
     }
 
-    public GameRoomState startGame(String lobbyId) {
+    public GameRoomState startGame(String lobbyId, int stops) {
         GameRoomState state = lobbyStore.get(lobbyId)
                 .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
 
@@ -97,10 +97,11 @@ public class LobbyService {
         }
 
         state.setPhase(GamePhase.IN_TURN);
-        
-        // 1. Give each player their required cities (2 per continent = 8 total initially)
+
+        int continentCount = Continent.values().length;
+        int amountPerContinent = Math.max(1, stops / continentCount);
         List<City> allCities = getDefaultCities();
-        cityDistributor.distributeByContinent(allCities, state.getPlayers(), 2);
+        cityDistributor.distributeByContinent(allCities, state.getPlayers(), amountPerContinent);
 
         // 2. Setup initial positions (use first target city as start city for sprint 1 simplicity)
         for (PlayerState player : state.getPlayers()) {

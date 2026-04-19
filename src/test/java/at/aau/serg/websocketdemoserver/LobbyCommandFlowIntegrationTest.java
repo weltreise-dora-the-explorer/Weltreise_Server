@@ -40,7 +40,7 @@ class LobbyCommandFlowIntegrationTest {
         StompSession session = initSession("/topic/lobby/" + lobbyId + "/events", messages);
 
         session.send("/app/lobby/" + lobbyId + "/command",
-                new ClientCommand(CommandType.CREATE_LOBBY, null, "player-1", null));
+                new ClientCommand(CommandType.CREATE_LOBBY, null, "player-1", null, null));
         CommandResponse create = messages.poll(1, TimeUnit.SECONDS);
         assertThat(create).isNotNull();
         assertThat(create.isSuccess()).isTrue();
@@ -48,21 +48,21 @@ class LobbyCommandFlowIntegrationTest {
         assertThat(create.getState().getPlayers()).hasSize(1);
 
         session.send("/app/lobby/" + lobbyId + "/command",
-                new ClientCommand(CommandType.JOIN_LOBBY, null, "player-2", null));
+                new ClientCommand(CommandType.JOIN_LOBBY, null, "player-2", null, null));
         CommandResponse joinTwo = messages.poll(1, TimeUnit.SECONDS);
         assertThat(joinTwo).isNotNull();
         assertThat(joinTwo.isSuccess()).isTrue();
         assertThat(joinTwo.getState().getPlayers()).hasSize(2);
 
         session.send("/app/lobby/" + lobbyId + "/command",
-                new ClientCommand(CommandType.START_GAME, null, "player-1", null));
+                new ClientCommand(CommandType.START_GAME, null, "player-1", null, null));
         CommandResponse start = messages.poll(1, TimeUnit.SECONDS);
         assertThat(start).isNotNull();
         assertThat(start.isSuccess()).isTrue();
         assertThat(start.getState().getCurrentPlayerId()).isEqualTo("player-1");
 
         session.send("/app/lobby/" + lobbyId + "/command",
-                new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null));
+                new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null, null));
         CommandResponse roll = messages.poll(1, TimeUnit.SECONDS);
         assertThat(roll).isNotNull();
         assertThat(roll.isSuccess()).isTrue();
@@ -70,7 +70,7 @@ class LobbyCommandFlowIntegrationTest {
 
         int rolledValue = roll.getState().getLastDiceValue();
         session.send("/app/lobby/" + lobbyId + "/command",
-                new ClientCommand(CommandType.MOVE_TOKEN, null, "player-1", rolledValue));
+                new ClientCommand(CommandType.MOVE_TOKEN, null, "player-1", rolledValue, null));
         CommandResponse move = messages.poll(1, TimeUnit.SECONDS);
         assertThat(move).isNotNull();
         assertThat(move.isSuccess()).isTrue();
@@ -85,7 +85,7 @@ class LobbyCommandFlowIntegrationTest {
         StompSession session = initSession("/topic/lobby/" + lobbyId + "/events", messages);
 
         session.send("/app/lobby/" + lobbyId + "/command",
-                new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null));
+                new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null, null));
         CommandResponse response = messages.poll(1, TimeUnit.SECONDS);
 
         assertThat(response).isNotNull();
@@ -100,7 +100,7 @@ class LobbyCommandFlowIntegrationTest {
         StompSession session = initSession("/topic/lobby/" + lobbyId + "/events", messages);
 
         session.send("/app/lobby/" + lobbyId + "/command",
-                new ClientCommand(null, null, "player-1", null));
+                new ClientCommand(null, null, "player-1", null, null));
         CommandResponse response = messages.poll(1, TimeUnit.SECONDS);
 
         assertThat(response).isNotNull();

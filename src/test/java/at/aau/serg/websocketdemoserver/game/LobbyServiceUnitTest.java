@@ -82,7 +82,7 @@ class LobbyServiceUnitTest {
     void joinLobbyRejectsJoiningStartedGame() {
         service.createLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
-        service.startGame("lobby-1");
+        service.startGame("lobby-1", 12);
 
         assertThatThrownBy(() -> service.joinLobby("lobby-1", "player-3"))
                 .isInstanceOf(GameException.class)
@@ -114,7 +114,7 @@ class LobbyServiceUnitTest {
         service.createLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
 
-        GameRoomState state = service.startGame("lobby-1");
+        GameRoomState state = service.startGame("lobby-1", 12);
 
         assertThat(state.getPhase()).isEqualTo(GamePhase.IN_TURN);
         assertThat(state.getCurrentPlayerId()).isEqualTo("player-1");
@@ -125,14 +125,14 @@ class LobbyServiceUnitTest {
     void startGameRejectsLobbyWithLessThanTwoPlayers() {
         service.createLobby("lobby-1", "player-1");
 
-        assertThatThrownBy(() -> service.startGame("lobby-1"))
+        assertThatThrownBy(() -> service.startGame("lobby-1", 12))
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("At least two players");
     }
 
     @Test
     void startGameRejectsNonExistentLobby() {
-        assertThatThrownBy(() -> service.startGame("non-existent"))
+        assertThatThrownBy(() -> service.startGame("lobby-1", 12))
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("not found");
     }
@@ -141,9 +141,9 @@ class LobbyServiceUnitTest {
     void startGameRejectsAlreadyStartedGame() {
         service.createLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
-        service.startGame("lobby-1");
+        service.startGame("lobby-1", 12);
 
-        assertThatThrownBy(() -> service.startGame("lobby-1"))
+        assertThatThrownBy(() -> service.startGame("lobby-1", 12))
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("already started");
     }
@@ -154,7 +154,7 @@ class LobbyServiceUnitTest {
     void leaveLobbyRemovesCurrentPlayerAndRotatesTurn() {
         service.createLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
-        GameRoomState started = service.startGame("lobby-1");
+        GameRoomState started = service.startGame("lobby-1", 12);
         started.setLastDiceValue(5);
 
         GameRoomState state = service.leaveLobby("lobby-1", "player-1");
@@ -194,7 +194,7 @@ class LobbyServiceUnitTest {
     void leaveLobbyDoesNotChangeTurnWhenNonCurrentPlayerLeaves() {
         service.createLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
-        service.startGame("lobby-1");
+        service.startGame("lobby-1", 12);
 
         // player-2 leaves but player-1 is current player → turn stays with player-1
         GameRoomState state = service.leaveLobby("lobby-1", "player-2");
@@ -208,7 +208,7 @@ class LobbyServiceUnitTest {
         service.createLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
 
-        GameRoomState state = service.startGame("lobby-1");
+        GameRoomState state = service.startGame("lobby-1", 12);
 
         assertThat(state.getPlayers().get(0).getOwnedCities()).isNotEmpty();
         assertThat(state.getPlayers().get(0).getStartCity()).isNotNull();

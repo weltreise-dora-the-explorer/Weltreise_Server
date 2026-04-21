@@ -9,5 +9,6 @@ public enum CommandType {
     START_GAME,
     ROLL_DICE,
     MOVE_TOKEN,
-    LEAVE_LOBBY
+    LEAVE_LOBBY,
+    LOBBY_CLOSED
 }

@@ -21,7 +21,8 @@ class TurnBasedDtosUnitTest {
                 CommandType.START_GAME,
                 CommandType.ROLL_DICE,
                 CommandType.MOVE_TOKEN,
-                CommandType.LEAVE_LOBBY
+                CommandType.LEAVE_LOBBY,
+                CommandType.LOBBY_CLOSED
         );
     }
 
@@ -72,6 +73,7 @@ class TurnBasedDtosUnitTest {
 
         GameRoomState roomState = new GameRoomState(
                 "lobby-1",
+                null,
                 players,
                 GamePhase.IN_TURN,
                 "player-1",

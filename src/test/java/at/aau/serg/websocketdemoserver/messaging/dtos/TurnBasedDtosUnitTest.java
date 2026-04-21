@@ -72,6 +72,7 @@ class TurnBasedDtosUnitTest {
 
         GameRoomState roomState = new GameRoomState(
                 "lobby-1",
+                null,
                 players,
                 GamePhase.IN_TURN,
                 "player-1",

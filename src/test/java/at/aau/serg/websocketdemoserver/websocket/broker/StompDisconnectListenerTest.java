@@ -1,6 +1,7 @@
 package at.aau.serg.websocketdemoserver.websocket.broker;
 
 import at.aau.serg.websocketdemoserver.game.GameException;
+import at.aau.serg.websocketdemoserver.game.LobbyLeaveResult;
 import at.aau.serg.websocketdemoserver.game.LobbyService;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
@@ -33,12 +34,12 @@ class StompDisconnectListenerTest {
     private SessionDisconnectEvent event;
 
     @Test
-    void handleDisconnectRemovesPlayerAndBroadcastsLeaveEvent() {
+    void handleDisconnectBroadcastsLeaveEvent_WhenNonHostDisconnects() {
         when(event.getSessionId()).thenReturn("session-1");
         when(sessionRegistry.get("session-1")).thenReturn(Optional.of(new SessionRegistry.SessionInfo("lobby-1", "player-1")));
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");
-        when(lobbyService.leaveLobby("lobby-1", "player-1")).thenReturn(state);
+        when(lobbyService.leaveLobby("lobby-1", "player-1")).thenReturn(new LobbyLeaveResult(state, false));
 
         StompDisconnectListener listener = new StompDisconnectListener(sessionRegistry, lobbyService, messagingTemplate);
         listener.handleDisconnect(event);
@@ -48,6 +49,23 @@ class StompDisconnectListenerTest {
         assertThat(captor.getValue().isSuccess()).isTrue();
         assertThat(captor.getValue().getCommandType()).isEqualTo(CommandType.LEAVE_LOBBY);
         assertThat(captor.getValue().getState()).isEqualTo(state);
+        verify(sessionRegistry).remove("session-1");
+    }
+
+    @Test
+    void handleDisconnectBroadcastsLobbyClosed_WhenHostDisconnects() {
+        when(event.getSessionId()).thenReturn("session-1");
+        when(sessionRegistry.get("session-1")).thenReturn(Optional.of(new SessionRegistry.SessionInfo("lobby-1", "host-player")));
+        GameRoomState state = new GameRoomState();
+        state.setLobbyId("lobby-1");
+        when(lobbyService.leaveLobby("lobby-1", "host-player")).thenReturn(new LobbyLeaveResult(state, true));
+
+        StompDisconnectListener listener = new StompDisconnectListener(sessionRegistry, lobbyService, messagingTemplate);
+        listener.handleDisconnect(event);
+
+        ArgumentCaptor<CommandResponse> captor = ArgumentCaptor.forClass(CommandResponse.class);
+        verify(messagingTemplate).convertAndSend(eq("/topic/lobby/lobby-1/events"), captor.capture());
+        assertThat(captor.getValue().getCommandType()).isEqualTo(CommandType.LOBBY_CLOSED);
         verify(sessionRegistry).remove("session-1");
     }
 
@@ -71,6 +89,7 @@ class StompDisconnectListenerTest {
         when(lobbyService.leaveLobby("lobby-1", "player-1"))
                 .thenThrow(new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
 
+
         StompDisconnectListener listener = new StompDisconnectListener(sessionRegistry, lobbyService, messagingTemplate);
         listener.handleDisconnect(event);
 
@@ -84,6 +103,7 @@ class StompDisconnectListenerTest {
         when(sessionRegistry.get("session-1")).thenReturn(Optional.of(new SessionRegistry.SessionInfo("lobby-1", "player-1")));
         when(lobbyService.leaveLobby("lobby-1", "player-1"))
                 .thenThrow(new GameException(ErrorCode.PLAYER_NOT_IN_LOBBY, "Player not in lobby"));
+
 
         StompDisconnectListener listener = new StompDisconnectListener(sessionRegistry, lobbyService, messagingTemplate);
         listener.handleDisconnect(event);

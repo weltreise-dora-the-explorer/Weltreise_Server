@@ -1,6 +1,7 @@
 package at.aau.serg.websocketdemoserver.game;
 
 import at.aau.serg.websocketdemoserver.game.GameException;
+import at.aau.serg.websocketdemoserver.game.LobbyLeaveResult;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import org.junit.jupiter.api.BeforeEach;
@@ -180,18 +181,19 @@ class LobbyServiceUnitTest {
         GameRoomState started = service.startGame("lobby-1", 12);
         started.setLastDiceValue(5);
 
-        GameRoomState state = service.leaveLobby("lobby-1", "player-1");
+        LobbyLeaveResult result = service.leaveLobby("lobby-1", "player-2");
 
-        assertThat(state.getPlayers()).hasSize(1);
-        assertThat(state.getPlayers().getFirst().getPlayerId()).isEqualTo("player-2");
-        assertThat(state.getCurrentPlayerId()).isEqualTo("player-2");
-        assertThat(state.getLastDiceValue()).isNull();
+        assertThat(result.state().getPlayers()).hasSize(1);
+        assertThat(result.state().getPlayers().getFirst().getPlayerId()).isEqualTo("player-1");
+        assertThat(result.lobbyClosed()).isFalse();
     }
 
     @Test
-    void leaveLobbyRemovesLobbyWhenLastPlayerLeaves() {
+    void leaveLobbyRemovesLobbyWhenLastNonHostPlayerLeaves() {
         service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
 
+        service.leaveLobby("lobby-1", "player-2");
         service.leaveLobby("lobby-1", "player-1");
 
         assertThat(store.get("lobby-1")).isEmpty();
@@ -219,11 +221,58 @@ class LobbyServiceUnitTest {
         service.joinLobby("lobby-1", "player-2");
         service.startGame("lobby-1", 12);
 
-        // player-2 leaves but player-1 is current player → turn stays with player-1
-        GameRoomState state = service.leaveLobby("lobby-1", "player-2");
+        LobbyLeaveResult result = service.leaveLobby("lobby-1", "player-2");
 
-        assertThat(state.getCurrentPlayerId()).isEqualTo("player-1");
-        assertThat(state.getPlayers()).hasSize(1);
+        assertThat(result.state().getCurrentPlayerId()).isEqualTo("player-1");
+        assertThat(result.state().getPlayers()).hasSize(1);
+    }
+
+    @Test
+    void leaveLobbyReturnsLobbyClosed_WhenHostLeaves() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+
+        LobbyLeaveResult result = service.leaveLobby("lobby-1", "player-1");
+
+        assertThat(result.lobbyClosed()).isTrue();
+    }
+
+    @Test
+    void leaveLobbyRemovesAllPlayers_WhenHostLeaves() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.joinLobby("lobby-1", "player-3");
+
+        LobbyLeaveResult result = service.leaveLobby("lobby-1", "player-1");
+
+        assertThat(result.state().getPlayers()).isEmpty();
+    }
+
+    @Test
+    void leaveLobbyDeletesLobby_WhenHostLeaves() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+
+        service.leaveLobby("lobby-1", "player-1");
+
+        assertThat(store.get("lobby-1")).isEmpty();
+    }
+
+    @Test
+    void leaveLobbyReturnsNotClosed_WhenNonHostLeaves() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+
+        LobbyLeaveResult result = service.leaveLobby("lobby-1", "player-2");
+
+        assertThat(result.lobbyClosed()).isFalse();
+    }
+
+    @Test
+    void createLobby_SetsHostId() {
+        GameRoomState state = service.createLobby("lobby-1", "host-player");
+
+        assertThat(state.getHostId()).isEqualTo("host-player");
     }
 
     @Test

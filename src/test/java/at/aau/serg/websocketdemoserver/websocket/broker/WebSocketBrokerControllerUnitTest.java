@@ -3,6 +3,7 @@ package at.aau.serg.websocketdemoserver.websocket.broker;
 import at.aau.serg.websocketdemoserver.game.GameCommandService;
 import at.aau.serg.websocketdemoserver.game.GameException;
 import at.aau.serg.websocketdemoserver.game.InMemoryLobbyStore;
+import at.aau.serg.websocketdemoserver.game.LobbyLeaveResult;
 import at.aau.serg.websocketdemoserver.game.LobbyService;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
@@ -87,7 +88,7 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandUnregistersSessionOnLeaveLobby() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.LEAVE_LOBBY, null, "player-1", null, null);
-        when(lobbyService.leaveLobby("lobby-1", "player-1")).thenReturn(new GameRoomState());
+        when(lobbyService.leaveLobby("lobby-1", "player-1")).thenReturn(new LobbyLeaveResult(new GameRoomState(), false));
 
         controller.handleLobbyCommand("lobby-1", command, headerWithSession("session-xyz"));
 
@@ -255,13 +256,13 @@ class WebSocketBrokerControllerUnitTest {
     }
 
     @Test
-    void handleLobbyCommandRoutesLeaveLobbyAndReturnsSuccessResponse() {
+    void handleLobbyCommandRoutesLeaveLobbyAndReturnsLeaveResponse_WhenNonHost() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.LEAVE_LOBBY, null, "player-1", null, null);
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");
 
-        when(lobbyService.leaveLobby("lobby-1", "player-1")).thenReturn(state);
+        when(lobbyService.leaveLobby("lobby-1", "player-1")).thenReturn(new LobbyLeaveResult(state, false));
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
 
@@ -269,5 +270,21 @@ class WebSocketBrokerControllerUnitTest {
         assertThat(response.getCommandType()).isEqualTo(CommandType.LEAVE_LOBBY);
         assertThat(response.getState()).isEqualTo(state);
         verify(lobbyService).leaveLobby("lobby-1", "player-1");
+    }
+
+    @Test
+    void handleLobbyCommandReturnsLobbyClosed_WhenHostLeaves() {
+        WebSocketBrokerController controller = createController();
+        ClientCommand command = new ClientCommand(CommandType.LEAVE_LOBBY, null, "host-player", null, null);
+        GameRoomState state = new GameRoomState();
+        state.setLobbyId("lobby-1");
+
+        when(lobbyService.leaveLobby("lobby-1", "host-player")).thenReturn(new LobbyLeaveResult(state, true));
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
+
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getCommandType()).isEqualTo(CommandType.LOBBY_CLOSED);
+        assertThat(response.getState()).isEqualTo(state);
     }
 }

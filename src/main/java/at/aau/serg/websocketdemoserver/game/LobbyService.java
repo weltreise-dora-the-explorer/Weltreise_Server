@@ -35,6 +35,7 @@ public class LobbyService {
         }
         GameRoomState newLobby = new GameRoomState();
         newLobby.setLobbyId(lobbyId);
+        newLobby.setHostId(playerId);
         newLobby.getPlayers().add(new PlayerState(playerId));
         lobbyStore.put(lobbyId, newLobby);
         return newLobby;
@@ -61,7 +62,7 @@ public class LobbyService {
         return state;
     }
 
-    public GameRoomState leaveLobby(String lobbyId, String playerId) {
+    public LobbyLeaveResult leaveLobby(String lobbyId, String playerId) {
         validatePlayerId(playerId);
         GameRoomState state = lobbyStore.get(lobbyId)
                 .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
@@ -71,13 +72,19 @@ public class LobbyService {
             throw new GameException(ErrorCode.PLAYER_NOT_IN_LOBBY, "Player is not in lobby");
         }
 
+        if (playerId.equals(state.getHostId())) {
+            state.getPlayers().clear();
+            lobbyStore.remove(lobbyId);
+            return new LobbyLeaveResult(state, true);
+        }
+
         String previousCurrentPlayer = state.getCurrentPlayerId();
         state.getPlayers().remove(leavingIndex);
         state.setVersion(state.getVersion() + 1);
 
         if (state.getPlayers().isEmpty()) {
             lobbyStore.remove(lobbyId);
-            return state;
+            return new LobbyLeaveResult(state, false);
         }
 
         if (previousCurrentPlayer != null && previousCurrentPlayer.equals(playerId)) {
@@ -86,7 +93,7 @@ public class LobbyService {
             state.setLastDiceValue(null);
         }
 
-        return state;
+        return new LobbyLeaveResult(state, false);
     }
 
     public GameRoomState startGame(String lobbyId, int stops) {

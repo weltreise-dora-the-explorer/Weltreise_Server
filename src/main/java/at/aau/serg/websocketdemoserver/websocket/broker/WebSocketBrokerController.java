@@ -3,6 +3,7 @@ package at.aau.serg.websocketdemoserver.websocket.broker;
 import at.aau.serg.websocketdemoserver.game.GameCommandService;
 import at.aau.serg.websocketdemoserver.game.GameException;
 import at.aau.serg.websocketdemoserver.game.InMemoryLobbyStore;
+import at.aau.serg.websocketdemoserver.game.LobbyLeaveResult;
 import at.aau.serg.websocketdemoserver.game.LobbyService;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
@@ -61,6 +62,13 @@ public class WebSocketBrokerController {
             }
             command.setLobbyId(lobbyId);
 
+            if (commandType == CommandType.LEAVE_LOBBY) {
+                LobbyLeaveResult result = lobbyService.leaveLobby(lobbyId, command.getPlayerId());
+                unregisterSession(headerAccessor);
+                CommandType responseType = result.lobbyClosed() ? CommandType.LOBBY_CLOSED : CommandType.LEAVE_LOBBY;
+                return new CommandResponse(true, "OK", null, lobbyId, responseType, result.state());
+            }
+
             GameRoomState state = switch (commandType) {
                 case CREATE_LOBBY -> {
                     GameRoomState s = lobbyService.createLobby(lobbyId, command.getPlayerId());
@@ -72,11 +80,6 @@ public class WebSocketBrokerController {
                     registerSession(headerAccessor, lobbyId, command.getPlayerId());
                     yield s;
                 }
-                case LEAVE_LOBBY -> {
-                    GameRoomState s = lobbyService.leaveLobby(lobbyId, command.getPlayerId());
-                    unregisterSession(headerAccessor);
-                    yield s;
-                }
                 case START_GAME -> lobbyService.startGame(lobbyId, command.getStops() != null ? command.getStops() : 12);
                 case ROLL_DICE, MOVE_TOKEN -> {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
@@ -84,6 +87,7 @@ public class WebSocketBrokerController {
                     gameCommandService.processCommand(existingState, command);
                     yield existingState;
                 }
+                default -> throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type");
             };
 
             return new CommandResponse(true, "OK", null, lobbyId, commandType, state);

@@ -1,6 +1,7 @@
 package at.aau.serg.websocketdemoserver.websocket.broker;
 
 import at.aau.serg.websocketdemoserver.game.GameException;
+import at.aau.serg.websocketdemoserver.game.LobbyLeaveResult;
 import at.aau.serg.websocketdemoserver.game.LobbyService;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
@@ -28,9 +29,10 @@ public class StompDisconnectListener {
         String sessionId = event.getSessionId();
         sessionRegistry.get(sessionId).ifPresent(info -> {
             try {
-                GameRoomState state = lobbyService.leaveLobby(info.lobbyId(), info.playerId());
+                LobbyLeaveResult result = lobbyService.leaveLobby(info.lobbyId(), info.playerId());
+                CommandType responseType = result.lobbyClosed() ? CommandType.LOBBY_CLOSED : CommandType.LEAVE_LOBBY;
                 CommandResponse response = new CommandResponse(
-                        true, "OK", null, info.lobbyId(), CommandType.LEAVE_LOBBY, state
+                        true, "OK", null, info.lobbyId(), responseType, result.state()
                 );
                 messagingTemplate.convertAndSend("/topic/lobby/" + info.lobbyId() + "/events", response);
             } catch (GameException ignored) {

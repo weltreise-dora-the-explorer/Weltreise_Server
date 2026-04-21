@@ -19,6 +19,7 @@ import java.util.Objects;
 @Service
 public class LobbyService {
     private static final int MIN_PLAYERS_TO_START = 2;
+    private static final int MAX_PLAYERS_IN_LOBBY = 4;
 
     private final InMemoryLobbyStore lobbyStore;
     private final CityDistributor cityDistributor;
@@ -47,6 +48,9 @@ public class LobbyService {
 
         if (state.getPhase() != GamePhase.LOBBY) {
             throw new GameException(ErrorCode.CANNOT_JOIN_STARTED_GAME, "Cannot join started game");
+        }
+        if (state.getPlayers().size() >= MAX_PLAYERS_IN_LOBBY) {
+            throw new GameException(ErrorCode.LOBBY_FULL, "Lobby is full");
         }
         if (containsPlayer(state.getPlayers(), playerId)) {
             throw new GameException(ErrorCode.PLAYER_ALREADY_JOINED, "Player already joined lobby");

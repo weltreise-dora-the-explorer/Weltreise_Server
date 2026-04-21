@@ -107,6 +107,29 @@ class LobbyServiceUnitTest {
                 .hasMessageContaining("Player id is required");
     }
 
+    @Test
+    void joinLobbyAllowsFourthPlayer() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.joinLobby("lobby-1", "player-3");
+
+        GameRoomState state = service.joinLobby("lobby-1", "player-4");
+
+        assertThat(state.getPlayers()).hasSize(4);
+    }
+
+    @Test
+    void joinLobbyRejectsWhenLobbyIsFull() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.joinLobby("lobby-1", "player-3");
+        service.joinLobby("lobby-1", "player-4");
+
+        assertThatThrownBy(() -> service.joinLobby("lobby-1", "player-5"))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Lobby is full");
+    }
+
     // ========== START GAME TESTS ==========
 
     @Test

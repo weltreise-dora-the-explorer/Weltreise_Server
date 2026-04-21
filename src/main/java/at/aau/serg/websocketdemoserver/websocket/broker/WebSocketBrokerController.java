@@ -13,7 +13,7 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.StompMessage;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
-
+import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.stereotype.Controller;
 
 
@@ -26,13 +26,16 @@ public class WebSocketBrokerController {
     private final LobbyService lobbyService;
     private final GameCommandService gameCommandService;
     private final InMemoryLobbyStore lobbyStore;
+    private final SessionRegistry sessionRegistry;
 
     public WebSocketBrokerController(LobbyService lobbyService,
                                      GameCommandService gameCommandService,
-                                     InMemoryLobbyStore lobbyStore) {
+                                     InMemoryLobbyStore lobbyStore,
+                                     SessionRegistry sessionRegistry) {
         this.lobbyService = lobbyService;
         this.gameCommandService = gameCommandService;
         this.lobbyStore = lobbyStore;
+        this.sessionRegistry = sessionRegistry;
     }
 
     @MessageMapping("/hello")
@@ -50,7 +53,7 @@ public class WebSocketBrokerController {
 
     @MessageMapping("/lobby/{lobbyId}/command")
     @SendTo("/topic/lobby/{lobbyId}/events")
-    public CommandResponse handleLobbyCommand(@DestinationVariable String lobbyId, ClientCommand command) {
+    public CommandResponse handleLobbyCommand(@DestinationVariable String lobbyId, ClientCommand command, SimpMessageHeaderAccessor headerAccessor) {
         CommandType commandType = command != null ? command.getType() : null;
         try {
             if (command == null || commandType == null) {
@@ -59,9 +62,21 @@ public class WebSocketBrokerController {
             command.setLobbyId(lobbyId);
 
             GameRoomState state = switch (commandType) {
-                case CREATE_LOBBY -> lobbyService.createLobby(lobbyId, command.getPlayerId());
-                case JOIN_LOBBY -> lobbyService.joinLobby(lobbyId, command.getPlayerId());
-                case LEAVE_LOBBY -> lobbyService.leaveLobby(lobbyId, command.getPlayerId());
+                case CREATE_LOBBY -> {
+                    GameRoomState s = lobbyService.createLobby(lobbyId, command.getPlayerId());
+                    registerSession(headerAccessor, lobbyId, command.getPlayerId());
+                    yield s;
+                }
+                case JOIN_LOBBY -> {
+                    GameRoomState s = lobbyService.joinLobby(lobbyId, command.getPlayerId());
+                    registerSession(headerAccessor, lobbyId, command.getPlayerId());
+                    yield s;
+                }
+                case LEAVE_LOBBY -> {
+                    GameRoomState s = lobbyService.leaveLobby(lobbyId, command.getPlayerId());
+                    unregisterSession(headerAccessor);
+                    yield s;
+                }
                 case START_GAME -> lobbyService.startGame(lobbyId, command.getStops() != null ? command.getStops() : 12);
                 case ROLL_DICE, MOVE_TOKEN -> {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
@@ -79,4 +94,15 @@ public class WebSocketBrokerController {
         }
     }
 
+    private void registerSession(SimpMessageHeaderAccessor headerAccessor, String lobbyId, String playerId) {
+        if (headerAccessor != null && headerAccessor.getSessionId() != null) {
+            sessionRegistry.register(headerAccessor.getSessionId(), lobbyId, playerId);
+        }
+    }
+
+    private void unregisterSession(SimpMessageHeaderAccessor headerAccessor) {
+        if (headerAccessor != null && headerAccessor.getSessionId() != null) {
+            sessionRegistry.remove(headerAccessor.getSessionId());
+        }
+    }
 }

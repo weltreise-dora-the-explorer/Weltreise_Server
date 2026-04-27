@@ -27,7 +27,7 @@ class WorldGraphTest {
                 "id": "paris",
                 "name": "Paris",
                 "continent": "EUROPE",
-                "color": "blue",
+                "color": "orange",
                 "trainConnections": [],
                 "flightConnections": ["berlin"],
                 "x": 0.0, "y": 0.0, "x_relativ": 0.0, "y_relativ": 0.0

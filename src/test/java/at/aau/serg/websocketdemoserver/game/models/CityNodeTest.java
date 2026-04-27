@@ -13,7 +13,7 @@ class CityNodeTest {
     @BeforeEach
     void setup() {
         berlin = new CityNode("berlin", "Berlin", Continent.EUROPE, CityColor.RED);
-        paris  = new CityNode("paris",  "Paris",  Continent.EUROPE, CityColor.BLUE);
+        paris  = new CityNode("paris",  "Paris",  Continent.EUROPE, CityColor.ORANGE);
     }
 
     @Test
@@ -38,7 +38,7 @@ class CityNodeTest {
     @Test
     void addConnection_storesCorrectDestinationAndType() {
         berlin.addConnection(paris, ConnectionType.FLIGHT);
-        Connection conn = berlin.getConnections().get(0);
+        Connection conn = berlin.getConnections().getFirst();
 
         assertEquals("paris",           conn.getDestination().getId());
         assertEquals(ConnectionType.FLIGHT, conn.getType());

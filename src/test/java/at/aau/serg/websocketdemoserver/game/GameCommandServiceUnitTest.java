@@ -1,9 +1,7 @@
 package at.aau.serg.websocketdemoserver.game;
 
-import at.aau.serg.websocketdemoserver.game.GameException;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
-import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import at.aau.serg.websocketdemoserver.game.models.City;
@@ -24,7 +22,7 @@ class GameCommandServiceUnitTest {
     @Test
     void rollDiceSetsDiceValueAndIncrementsVersion() {
         GameCommandService service = new GameCommandService(new FixedRandom(4));
-        GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
+        GameRoomState state = inTurnState(defaultPlayers());
 
         service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
@@ -35,7 +33,7 @@ class GameCommandServiceUnitTest {
     @Test
     void rollDiceRejectsNonActivePlayer() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
-        GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
+        GameRoomState state = inTurnState(defaultPlayers());
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
@@ -47,7 +45,7 @@ class GameCommandServiceUnitTest {
     @Test
     void moveTokenRejectsWhenDiceWasNotRolled() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
-        GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
+        GameRoomState state = inTurnState(defaultPlayers());
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
@@ -59,7 +57,7 @@ class GameCommandServiceUnitTest {
     @Test
     void moveTokenRejectsWhenStepsDoNotMatchDiceValue() {
         GameCommandService service = new GameCommandService(new FixedRandom(3));
-        GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
+        GameRoomState state = inTurnState(defaultPlayers());
         service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
         assertThatThrownBy(() -> service.processCommand(
@@ -72,13 +70,13 @@ class GameCommandServiceUnitTest {
     @Test
     void moveTokenAdvancesPositionRotatesTurnAndClearsDice() {
         GameCommandService service = new GameCommandService(new FixedRandom(2));
-        List<PlayerState> players = players("player-1", "player-2");
-        GameRoomState state = inTurnState("player-1", players);
+        List<PlayerState> players = defaultPlayers();
+        GameRoomState state = inTurnState(players);
         service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
         service.processCommand(state, new ClientCommand(CommandType.MOVE_TOKEN, "lobby-1", "player-1", 3, null));
 
-        assertThat(players.get(0).getBoardPosition()).isEqualTo(3);
+        assertThat(players.getFirst().getBoardPosition()).isEqualTo(3);
         assertThat(state.getCurrentPlayerId()).isEqualTo("player-2");
         assertThat(state.getLastDiceValue()).isNull();
         assertThat(state.getVersion()).isEqualTo(2L);
@@ -87,7 +85,7 @@ class GameCommandServiceUnitTest {
     @Test
     void moveTokenRejectsNonActivePlayer() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
-        GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
+        GameRoomState state = inTurnState(defaultPlayers());
         service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
         assertThatThrownBy(() -> service.processCommand(
@@ -100,7 +98,7 @@ class GameCommandServiceUnitTest {
     @Test
     void rollDiceRejectsWhenDiceAlreadyRolled() {
         GameCommandService service = new GameCommandService(new FixedRandom(3));
-        GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
+        GameRoomState state = inTurnState(defaultPlayers());
         service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
         assertThatThrownBy(() -> service.processCommand(
@@ -134,7 +132,7 @@ class GameCommandServiceUnitTest {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
         GameRoomState state = new GameRoomState();
         state.setPhase(GamePhase.LOBBY);
-        state.setPlayers(players("player-1", "player-2"));
+        state.setPlayers(defaultPlayers());
         state.setCurrentPlayerId("player-1");
 
         assertThatThrownBy(() -> service.processCommand(
@@ -147,7 +145,7 @@ class GameCommandServiceUnitTest {
     @Test
     void moveTokenRejectsWhenMoveStepsNull() {
         GameCommandService service = new GameCommandService(new FixedRandom(3));
-        GameRoomState state = inTurnState("player-1", players("player-1", "player-2"));
+        GameRoomState state = inTurnState(defaultPlayers());
         service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
 
         assertThatThrownBy(() -> service.processCommand(
@@ -157,22 +155,22 @@ class GameCommandServiceUnitTest {
                 .hasMessageContaining("Move steps are required");
     }
 
-    private GameRoomState inTurnState(String currentPlayerId, List<PlayerState> players) {
+    private GameRoomState inTurnState(List<PlayerState> players) {
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");
         state.setPlayers(players);
         state.setPhase(GamePhase.IN_TURN);
-        state.setCurrentPlayerId(currentPlayerId);
+        state.setCurrentPlayerId("player-1");
         return state;
     }
 
-    private List<PlayerState> players(String firstPlayerId, String secondPlayerId) {
+    private List<PlayerState> defaultPlayers() {
         List<PlayerState> players = new ArrayList<>();
-        PlayerState p1 = new PlayerState(firstPlayerId);
+        PlayerState p1 = new PlayerState("player-1");
         p1.setCurrentCity(new City("vienna", "Vienna", Continent.EUROPE, CityColor.RED));
         players.add(p1);
-        PlayerState p2 = new PlayerState(secondPlayerId);
-        p2.setCurrentCity(new City("paris", "Paris", Continent.EUROPE, CityColor.BLUE));
+        PlayerState p2 = new PlayerState("player-2");
+        p2.setCurrentCity(new City("paris", "Paris", Continent.EUROPE, CityColor.GREEN));
         players.add(p2);
         return players;
     }

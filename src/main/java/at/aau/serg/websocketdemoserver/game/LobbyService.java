@@ -6,6 +6,7 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import at.aau.serg.websocketdemoserver.game.models.City;
 import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.springframework.stereotype.Service;
+ import at.aau.serg.websocketdemoserver.game.models.Continent; 
 
 import java.util.List;
 import java.util.Objects;
@@ -16,6 +17,7 @@ import java.util.Objects;
 @Service
 public class LobbyService {
     private static final int MIN_PLAYERS_TO_START = 2;
+    private static final int MAX_PLAYERS_IN_LOBBY = 4;
 
     private final InMemoryLobbyStore lobbyStore;
     private final CityDistributor cityDistributor;
@@ -32,6 +34,7 @@ public class LobbyService {
         }
         GameRoomState newLobby = new GameRoomState();
         newLobby.setLobbyId(lobbyId);
+        newLobby.setHostId(playerId);
         newLobby.getPlayers().add(new PlayerState(playerId));
         lobbyStore.put(lobbyId, newLobby);
         return newLobby;
@@ -46,6 +49,9 @@ public class LobbyService {
         if (state.getPhase() != GamePhase.LOBBY) {
             throw new GameException(ErrorCode.CANNOT_JOIN_STARTED_GAME, "Cannot join started game");
         }
+        if (state.getPlayers().size() >= MAX_PLAYERS_IN_LOBBY) {
+            throw new GameException(ErrorCode.LOBBY_FULL, "Lobby is full");
+        }
         if (containsPlayer(state.getPlayers(), playerId)) {
             throw new GameException(ErrorCode.PLAYER_ALREADY_JOINED, "Player already joined lobby");
         }
@@ -55,7 +61,7 @@ public class LobbyService {
         return state;
     }
 
-    public GameRoomState leaveLobby(String lobbyId, String playerId) {
+    public LobbyLeaveResult leaveLobby(String lobbyId, String playerId) {
         validatePlayerId(playerId);
         GameRoomState state = lobbyStore.get(lobbyId)
                 .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
@@ -65,13 +71,19 @@ public class LobbyService {
             throw new GameException(ErrorCode.PLAYER_NOT_IN_LOBBY, "Player is not in lobby");
         }
 
+        if (playerId.equals(state.getHostId())) {
+            state.getPlayers().clear();
+            lobbyStore.remove(lobbyId);
+            return new LobbyLeaveResult(state, true);
+        }
+
         String previousCurrentPlayer = state.getCurrentPlayerId();
         state.getPlayers().remove(leavingIndex);
         state.setVersion(state.getVersion() + 1);
 
         if (state.getPlayers().isEmpty()) {
             lobbyStore.remove(lobbyId);
-            return state;
+            return new LobbyLeaveResult(state, false);
         }
 
         if (previousCurrentPlayer != null && previousCurrentPlayer.equals(playerId)) {
@@ -80,10 +92,10 @@ public class LobbyService {
             state.setLastDiceValue(null);
         }
 
-        return state;
+        return new LobbyLeaveResult(state, false);
     }
 
-    public GameRoomState startGame(String lobbyId) {
+    public GameRoomState startGame(String lobbyId, int stops) {
         GameRoomState state = lobbyStore.get(lobbyId)
                 .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
 
@@ -98,8 +110,10 @@ public class LobbyService {
         
         // 1. Give each player their required cities (2 per continent = 8 total initially)
         // Wir holen die Städte jetzt aus dem geladenen JSON-Speicher!
+        int continentCount = Continent.values().length;
+        int amountPerContinent = Math.max(1, stops / continentCount);                 
         List<City> allCities = cityDistributor.getAllCities();
-        cityDistributor.distributeByContinent(allCities, state.getPlayers(), 2);
+        cityDistributor.distributeByContinent(allCities, state.getPlayers(),amountPerContinent);  
 
         // 2. Setup initial positions (use first target city as start city for sprint 1 simplicity)
         for (PlayerState player : state.getPlayers()) {

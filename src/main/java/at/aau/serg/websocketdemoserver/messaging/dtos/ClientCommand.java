@@ -15,4 +15,5 @@ public class ClientCommand {
     private String lobbyId;
     private String playerId;
     private Integer moveSteps;
+    private Integer stops;
 }

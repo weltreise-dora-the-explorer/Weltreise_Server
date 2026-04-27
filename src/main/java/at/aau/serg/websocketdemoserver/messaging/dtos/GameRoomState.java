@@ -18,6 +18,7 @@ import java.util.List;
 @AllArgsConstructor
 public class GameRoomState {
     private String lobbyId;
+    private String hostId;
     private List<PlayerState> players = new ArrayList<>();
     private GamePhase phase = GamePhase.LOBBY;
     private String currentPlayerId;

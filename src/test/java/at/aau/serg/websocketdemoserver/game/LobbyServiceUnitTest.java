@@ -1,6 +1,5 @@
 package at.aau.serg.websocketdemoserver.game;
 
-import at.aau.serg.websocketdemoserver.game.GameException;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,7 +16,9 @@ class LobbyServiceUnitTest {
     @BeforeEach
     void setUp() {
         store = new InMemoryLobbyStore();
-        service = new LobbyService(store, new CityDistributor());
+        CityDistributor distributor = new CityDistributor();
+        distributor.loadCitiesFromJson();
+        service = new LobbyService(store, distributor);
     }
 
     // ========== CREATE LOBBY TESTS ==========
@@ -37,7 +38,7 @@ class LobbyServiceUnitTest {
         service.createLobby("lobby-1", "host-player");
 
         assertThat(store.get("lobby-1")).isPresent();
-        assertThat(store.get("lobby-1").get().getPlayers()).hasSize(1);
+        assertThat(store.get("lobby-1").orElseThrow().getPlayers()).hasSize(1);
     }
 
     @Test
@@ -210,8 +211,8 @@ class LobbyServiceUnitTest {
 
         GameRoomState state = service.startGame("lobby-1");
 
-        assertThat(state.getPlayers().get(0).getOwnedCities()).isNotEmpty();
-        assertThat(state.getPlayers().get(0).getStartCity()).isNotNull();
-        assertThat(state.getPlayers().get(0).getCurrentCity()).isNotNull();
+        assertThat(state.getPlayers().getFirst().getOwnedCities()).isNotEmpty();
+        assertThat(state.getPlayers().getFirst().getStartCity()).isNotNull();
+        assertThat(state.getPlayers().getFirst().getCurrentCity()).isNotNull();
     }
 }

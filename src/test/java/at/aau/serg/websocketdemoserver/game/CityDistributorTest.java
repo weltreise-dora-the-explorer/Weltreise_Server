@@ -37,29 +37,29 @@ class CityDistributorTest {
                 // Europa (6)
                 new City("wien", "Wien", Continent.EUROPE, CityColor.RED),
                 new City("berlin", "Berlin", Continent.EUROPE, CityColor.RED),
-                new City("paris", "Paris", Continent.EUROPE, CityColor.BLUE),
-                new City("rom", "Rom", Continent.EUROPE, CityColor.BLUE),
+                new City("paris", "Paris", Continent.EUROPE, CityColor.GREEN),
+                new City("rom", "Rom", Continent.EUROPE, CityColor.GREEN),
                 new City("madrid", "Madrid", Continent.EUROPE, CityColor.GREEN),
                 new City("london", "London", Continent.EUROPE, CityColor.GREEN),
                 // Asien (6)
                 new City("tokio", "Tokio", Continent.ASIA, CityColor.RED),
                 new City("peking", "Peking", Continent.ASIA, CityColor.RED),
-                new City("bangkok", "Bangkok", Continent.ASIA, CityColor.BLUE),
-                new City("seoul", "Seoul", Continent.ASIA, CityColor.BLUE),
+                new City("bangkok", "Bangkok", Continent.ASIA, CityColor.GREEN),
+                new City("seoul", "Seoul", Continent.ASIA, CityColor.GREEN),
                 new City("neu-delhi", "Neu-Delhi", Continent.ASIA, CityColor.GREEN),
                 new City("singapur", "Singapur", Continent.ASIA, CityColor.GREEN),
                 // Nordamerika (6)
                 new City("new-york", "New York", Continent.NORTH_AMERICA, CityColor.RED),
                 new City("los-angeles", "Los Angeles", Continent.NORTH_AMERICA, CityColor.RED),
-                new City("toronto", "Toronto", Continent.NORTH_AMERICA, CityColor.BLUE),
-                new City("chicago", "Chicago", Continent.NORTH_AMERICA, CityColor.BLUE),
+                new City("toronto", "Toronto", Continent.NORTH_AMERICA, CityColor.GREEN),
+                new City("chicago", "Chicago", Continent.NORTH_AMERICA, CityColor.GREEN),
                 new City("mexiko-stadt", "Mexiko-Stadt", Continent.NORTH_AMERICA, CityColor.GREEN),
                 new City("miami", "Miami", Continent.NORTH_AMERICA, CityColor.GREEN),
                 // Südamerika (6)
                 new City("rio", "Rio de Janeiro", Continent.SOUTH_AMERICA, CityColor.RED),
                 new City("buenos-aires", "Buenos Aires", Continent.SOUTH_AMERICA, CityColor.RED),
-                new City("lima", "Lima", Continent.SOUTH_AMERICA, CityColor.BLUE),
-                new City("bogota", "Bogota", Continent.SOUTH_AMERICA, CityColor.BLUE),
+                new City("lima", "Lima", Continent.SOUTH_AMERICA, CityColor.GREEN),
+                new City("bogota", "Bogota", Continent.SOUTH_AMERICA, CityColor.GREEN),
                 new City("santiago", "Santiago", Continent.SOUTH_AMERICA, CityColor.GREEN),
                 new City("quito", "Quito", Continent.SOUTH_AMERICA, CityColor.GREEN)
         ));

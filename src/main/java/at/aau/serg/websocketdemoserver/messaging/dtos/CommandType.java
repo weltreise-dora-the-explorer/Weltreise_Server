@@ -9,6 +9,8 @@ public enum CommandType {
     START_GAME,
     ROLL_DICE,
     MOVE_TOKEN,
+    MOVE_TO_CITY,
+    END_TURN,
     LEAVE_LOBBY,
     LOBBY_CLOSED
 }

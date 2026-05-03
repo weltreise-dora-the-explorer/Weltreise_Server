@@ -21,6 +21,8 @@ class TurnBasedDtosUnitTest {
                 CommandType.START_GAME,
                 CommandType.ROLL_DICE,
                 CommandType.MOVE_TOKEN,
+                CommandType.MOVE_TO_CITY,
+                CommandType.END_TURN,
                 CommandType.LEAVE_LOBBY,
                 CommandType.LOBBY_CLOSED
         );

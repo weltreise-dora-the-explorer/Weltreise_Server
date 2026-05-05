@@ -24,9 +24,9 @@ class MovementEngineTest {
     void setup() {
         engine = new MovementEngine();
 
-        berlin = new CityNode("berlin", "Berlin", Continent.EUROPE, CityColor.RED);
-        paris  = new CityNode("paris",  "Paris",  Continent.EUROPE, CityColor.ORANGE);
-        CityNode london = new CityNode("london", "London", Continent.EUROPE, CityColor.GREEN);
+        berlin = new CityNode("berlin", "Berlin", Continent.EUROPE_AFRICA, CityColor.RED);
+        paris  = new CityNode("paris",  "Paris",  Continent.EUROPE_AFRICA, CityColor.ORANGE);
+        CityNode london = new CityNode("london", "London", Continent.EUROPE_AFRICA, CityColor.GREEN);
         tokio  = new CityNode("tokio",  "Tokio",  Continent.ASIA,   CityColor.ORANGE);
 
         // Berlin --(Zug)--> Paris, Berlin --(Flug)--> Tokio, Berlin --(Zug)--> London

@@ -32,15 +32,15 @@ class CityDistributorTest {
                 new PlayerState("Charlie")
         ));
 
-        // Liste: 4 Kontinente mit je 6 Städten
+        // Liste: 3 Kontinente mit je 6 Städten
         testCities = new ArrayList<>(List.of(
-                // Europa (6)
-                new City("wien", "Wien", Continent.EUROPE, CityColor.RED),
-                new City("berlin", "Berlin", Continent.EUROPE, CityColor.RED),
-                new City("paris", "Paris", Continent.EUROPE, CityColor.ORANGE),
-                new City("rom", "Rom", Continent.EUROPE, CityColor.ORANGE),
-                new City("madrid", "Madrid", Continent.EUROPE, CityColor.GREEN),
-                new City("london", "London", Continent.EUROPE, CityColor.GREEN),
+                // Europa & Afrika (6)
+                new City("wien", "Wien", Continent.EUROPE_AFRICA, CityColor.RED),
+                new City("berlin", "Berlin", Continent.EUROPE_AFRICA, CityColor.RED),
+                new City("paris", "Paris", Continent.EUROPE_AFRICA, CityColor.ORANGE),
+                new City("rom", "Rom", Continent.EUROPE_AFRICA, CityColor.ORANGE),
+                new City("madrid", "Madrid", Continent.EUROPE_AFRICA, CityColor.GREEN),
+                new City("london", "London", Continent.EUROPE_AFRICA, CityColor.GREEN),
                 // Asien (6)
                 new City("tokio", "Tokio", Continent.ASIA, CityColor.RED),
                 new City("peking", "Peking", Continent.ASIA, CityColor.RED),
@@ -48,20 +48,13 @@ class CityDistributorTest {
                 new City("seoul", "Seoul", Continent.ASIA, CityColor.ORANGE),
                 new City("neu-delhi", "Neu-Delhi", Continent.ASIA, CityColor.GREEN),
                 new City("singapur", "Singapur", Continent.ASIA, CityColor.GREEN),
-                // Nordamerika (6)
-                new City("new-york", "New York", Continent.NORTH_AMERICA, CityColor.RED),
-                new City("los-angeles", "Los Angeles", Continent.NORTH_AMERICA, CityColor.RED),
-                new City("toronto", "Toronto", Continent.NORTH_AMERICA, CityColor.ORANGE),
-                new City("chicago", "Chicago", Continent.NORTH_AMERICA, CityColor.ORANGE),
-                new City("mexiko-stadt", "Mexiko-Stadt", Continent.NORTH_AMERICA, CityColor.GREEN),
-                new City("miami", "Miami", Continent.NORTH_AMERICA, CityColor.GREEN),
-                // Südamerika (6)
-                new City("rio", "Rio de Janeiro", Continent.SOUTH_AMERICA, CityColor.RED),
-                new City("buenos-aires", "Buenos Aires", Continent.SOUTH_AMERICA, CityColor.RED),
-                new City("lima", "Lima", Continent.SOUTH_AMERICA, CityColor.ORANGE),
-                new City("bogota", "Bogota", Continent.SOUTH_AMERICA, CityColor.ORANGE),
-                new City("santiago", "Santiago", Continent.SOUTH_AMERICA, CityColor.GREEN),
-                new City("quito", "Quito", Continent.SOUTH_AMERICA, CityColor.GREEN)
+                // Amerika & Ozeanien (6)
+                new City("new-york", "New York", Continent.AMERICAS_OCEANIA, CityColor.RED),
+                new City("los-angeles", "Los Angeles", Continent.AMERICAS_OCEANIA, CityColor.RED),
+                new City("toronto", "Toronto", Continent.AMERICAS_OCEANIA, CityColor.ORANGE),
+                new City("chicago", "Chicago", Continent.AMERICAS_OCEANIA, CityColor.ORANGE),
+                new City("mexiko-stadt", "Mexiko-Stadt", Continent.AMERICAS_OCEANIA, CityColor.GREEN),
+                new City("miami", "Miami", Continent.AMERICAS_OCEANIA, CityColor.GREEN)
         ));
     }
 
@@ -70,29 +63,26 @@ class CityDistributorTest {
         distributor.distributeByContinent(testCities, players, 2);
 
         for (PlayerState player : players) {
-            assertEquals(8, player.getOwnedCities().size(),
-                    player.getPlayerId() + " sollte genau 8 Städte haben");
+            assertEquals(6, player.getOwnedCities().size(),
+                    player.getPlayerId() + " sollte genau 6 Städte haben");
 
-            long europeCount = player.getOwnedCities().stream()
-                    .filter(c -> c.getContinent() == Continent.EUROPE).count();
+            long europeAfricaCount = player.getOwnedCities().stream()
+                    .filter(c -> c.getContinent() == Continent.EUROPE_AFRICA).count();
             long asiaCount = player.getOwnedCities().stream()
                     .filter(c -> c.getContinent() == Continent.ASIA).count();
-            long naCount = player.getOwnedCities().stream()
-                    .filter(c -> c.getContinent() == Continent.NORTH_AMERICA).count();
-            long saCount = player.getOwnedCities().stream()
-                    .filter(c -> c.getContinent() == Continent.SOUTH_AMERICA).count();
+            long americasCount = player.getOwnedCities().stream()
+                    .filter(c -> c.getContinent() == Continent.AMERICAS_OCEANIA).count();
 
-            assertEquals(2, europeCount, player.getPlayerId() + " hat nicht 2 in Europa");
+            assertEquals(2, europeAfricaCount, player.getPlayerId() + " hat nicht 2 in Europa/Afrika");
             assertEquals(2, asiaCount, player.getPlayerId() + " hat nicht 2 in Asien");
-            assertEquals(2, naCount, player.getPlayerId() + " hat nicht 2 in Nordamerika");
-            assertEquals(2, saCount, player.getPlayerId() + " hat nicht 2 in Südamerika");
+            assertEquals(2, americasCount, player.getPlayerId() + " hat nicht 2 in Amerika/Ozeanien");
         }
     }
 
     @Test
     void distributeByContinent_handlesNotEnoughCitiesInPool() {
         List<City> fewCities = new ArrayList<>(List.of(
-                new City("wien", "Wien", Continent.EUROPE, CityColor.RED)
+                new City("wien", "Wien", Continent.EUROPE_AFRICA, CityColor.RED)
         ));
 
         distributor.distributeByContinent(fewCities, players, 2);
@@ -150,9 +140,9 @@ class CityDistributorTest {
     private List<City> colorTestCities() {
         List<City> cities = new ArrayList<>();
         for (int i = 1; i <= 6; i++) {
-            cities.add(new City("orange-" + i, "Orange " + i, Continent.EUROPE, CityColor.ORANGE));
+            cities.add(new City("orange-" + i, "Orange " + i, Continent.EUROPE_AFRICA, CityColor.ORANGE));
             cities.add(new City("red-" + i, "Red " + i, Continent.ASIA, CityColor.RED));
-            cities.add(new City("green-" + i, "Green " + i, Continent.NORTH_AMERICA, CityColor.GREEN));
+            cities.add(new City("green-" + i, "Green " + i, Continent.AMERICAS_OCEANIA, CityColor.GREEN));
         }
         return cities;
     }
@@ -191,7 +181,7 @@ class CityDistributorTest {
     @Test
     void distributeByColor_handlesNotEnoughCitiesInPool() {
         List<City> fewCities = new ArrayList<>(List.of(
-                new City("orange-1", "Orange 1", Continent.EUROPE, CityColor.ORANGE)
+                new City("orange-1", "Orange 1", Continent.EUROPE_AFRICA, CityColor.ORANGE)
         ));
 
         distributor.distributeByColor(fewCities, players, 2);

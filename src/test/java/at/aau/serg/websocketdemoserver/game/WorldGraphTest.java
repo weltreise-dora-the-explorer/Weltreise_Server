@@ -17,7 +17,7 @@ class WorldGraphTest {
               {
                 "id": "berlin",
                 "name": "Berlin",
-                "continent": "EUROPE",
+                "continent": "EUROPE_AFRICA",
                 "color": "red",
                 "trainConnections": ["paris"],
                 "flightConnections": [],
@@ -26,7 +26,7 @@ class WorldGraphTest {
               {
                 "id": "paris",
                 "name": "Paris",
-                "continent": "EUROPE",
+                "continent": "EUROPE_AFRICA",
                 "color": "orange",
                 "trainConnections": [],
                 "flightConnections": ["berlin"],
@@ -136,6 +136,6 @@ class WorldGraphTest {
     void getCityById_returnsCorrectContinent() {
         CityNode berlin = graph.getCityById("berlin");
         assertNotNull(berlin);
-        assertEquals("EUROPE", berlin.getContinent().name());
+        assertEquals("EUROPE_AFRICA", berlin.getContinent().name());
     }
 }

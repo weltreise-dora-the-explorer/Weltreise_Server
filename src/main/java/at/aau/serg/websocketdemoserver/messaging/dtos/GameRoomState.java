@@ -24,4 +24,10 @@ public class GameRoomState {
     private String currentPlayerId;
     private Integer lastDiceValue;
     private long version = 0L;
+    private List<String> validMoveIds = new ArrayList<>();
+
+    public GameRoomState(String lobbyId, String hostId, List<PlayerState> players,
+                         GamePhase phase, String currentPlayerId, Integer lastDiceValue, long version) {
+        this(lobbyId, hostId, players, phase, currentPlayerId, lastDiceValue, version, new ArrayList<>());
+    }
 }

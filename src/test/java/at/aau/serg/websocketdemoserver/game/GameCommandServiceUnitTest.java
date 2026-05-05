@@ -167,10 +167,10 @@ class GameCommandServiceUnitTest {
     private List<PlayerState> defaultPlayers() {
         List<PlayerState> players = new ArrayList<>();
         PlayerState p1 = new PlayerState("player-1");
-        p1.setCurrentCity(new City("vienna", "Vienna", Continent.EUROPE, CityColor.RED));
+        p1.setCurrentCity(new City("vienna", "Vienna", Continent.EUROPE_AFRICA, CityColor.RED));
         players.add(p1);
         PlayerState p2 = new PlayerState("player-2");
-        p2.setCurrentCity(new City("paris", "Paris", Continent.EUROPE, CityColor.GREEN));
+        p2.setCurrentCity(new City("paris", "Paris", Continent.EUROPE_AFRICA, CityColor.GREEN));
         players.add(p2);
         return players;
     }

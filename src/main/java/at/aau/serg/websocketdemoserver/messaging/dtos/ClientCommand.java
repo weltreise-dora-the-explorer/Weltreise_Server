@@ -17,8 +17,9 @@ public class ClientCommand {
     private Integer moveSteps;
     private Integer stops;
     private String targetCityId;
+    private GameMode gameMode;
 
     public ClientCommand(CommandType type, String lobbyId, String playerId, Integer moveSteps, Integer stops) {
-        this(type, lobbyId, playerId, moveSteps, stops, null);
+        this(type, lobbyId, playerId, moveSteps, stops, null, null);
     }
 }

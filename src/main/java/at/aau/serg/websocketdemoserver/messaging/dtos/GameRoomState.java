@@ -26,8 +26,10 @@ public class GameRoomState {
     private long version = 0L;
     private List<String> validMoveIds = new ArrayList<>();
 
+    private GameMode gameMode = GameMode.CITY_HOPPER;
+
     public GameRoomState(String lobbyId, String hostId, List<PlayerState> players,
                          GamePhase phase, String currentPlayerId, Integer lastDiceValue, long version) {
-        this(lobbyId, hostId, players, phase, currentPlayerId, lastDiceValue, version, new ArrayList<>());
+        this(lobbyId, hostId, players, phase, currentPlayerId, lastDiceValue, version, new ArrayList<>(), GameMode.CITY_HOPPER);
     }
 }

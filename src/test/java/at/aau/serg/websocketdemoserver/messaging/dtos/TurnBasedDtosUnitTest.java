@@ -19,6 +19,7 @@ class TurnBasedDtosUnitTest {
                 CommandType.CREATE_LOBBY,
                 CommandType.JOIN_LOBBY,
                 CommandType.START_GAME,
+                CommandType.UPDATE_GAME_MODE,
                 CommandType.ROLL_DICE,
                 CommandType.MOVE_TOKEN,
                 CommandType.MOVE_TO_CITY,

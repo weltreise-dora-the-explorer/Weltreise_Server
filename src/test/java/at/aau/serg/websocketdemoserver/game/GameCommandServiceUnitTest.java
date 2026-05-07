@@ -2,6 +2,7 @@ package at.aau.serg.websocketdemoserver.game;
 
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
+import at.aau.serg.websocketdemoserver.messaging.dtos.GameMode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import at.aau.serg.websocketdemoserver.game.models.City;
@@ -154,6 +155,50 @@ class GameCommandServiceUnitTest {
                 .isInstanceOf(GameException.class)
                 .hasMessageContaining("Move steps are required");
     }
+
+    @Test
+    void hostCanUpdateGameModeInLobbyPhase() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+
+        GameRoomState state = new GameRoomState();
+        state.setLobbyId("lobby-1");
+        state.setHostId("host-1");
+        state.setPhase(GamePhase.LOBBY);
+        state.setGameMode(GameMode.CITY_HOPPER);
+        state.setVersion(0L);
+
+        ClientCommand command = new ClientCommand(CommandType.UPDATE_GAME_MODE, "lobby-1", "host-1", null, null);
+        command.setGameMode(GameMode.GRAND_TOUR);
+
+        service.processCommand(state, command);
+
+        assertThat(state.getGameMode()).isEqualTo(GameMode.GRAND_TOUR);
+        assertThat(state.getGameMode().getStops()).isEqualTo(9);
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void nonHostCannotUpdateGameMode() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+
+        GameRoomState state = new GameRoomState();
+        state.setLobbyId("lobby-1");
+        state.setHostId("host-1");
+        state.setPhase(GamePhase.LOBBY);
+        state.setGameMode(GameMode.CITY_HOPPER);
+        state.setVersion(0L);
+
+        ClientCommand command = new ClientCommand(CommandType.UPDATE_GAME_MODE, "lobby-1", "player-2", null, null);
+        command.setGameMode(GameMode.EPIC_VOYAGE);
+
+        assertThatThrownBy(() -> service.processCommand(state, command))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Only the host can change the game mode");
+
+        assertThat(state.getGameMode()).isEqualTo(GameMode.CITY_HOPPER);
+        assertThat(state.getVersion()).isEqualTo(0L);
+    }
+
 
     private GameRoomState inTurnState(List<PlayerState> players) {
         GameRoomState state = new GameRoomState();

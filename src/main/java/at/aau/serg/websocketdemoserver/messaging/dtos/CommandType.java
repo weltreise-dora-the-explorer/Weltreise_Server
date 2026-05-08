@@ -7,6 +7,7 @@ public enum CommandType {
     CREATE_LOBBY,
     JOIN_LOBBY,
     START_GAME,
+    UPDATE_GAME_MODE,
     ROLL_DICE,
     MOVE_TOKEN,
     MOVE_TO_CITY,

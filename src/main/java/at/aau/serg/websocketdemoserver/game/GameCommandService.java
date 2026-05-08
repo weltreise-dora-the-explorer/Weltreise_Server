@@ -3,6 +3,7 @@ package at.aau.serg.websocketdemoserver.game;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
+import at.aau.serg.websocketdemoserver.messaging.dtos.GameMode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import at.aau.serg.websocketdemoserver.game.models.City;
@@ -56,6 +57,12 @@ public class GameCommandService {
 
     public void processCommand(GameRoomState state, ClientCommand command) {
         validateBase(state, command);
+
+        if(command.getType() == CommandType.UPDATE_GAME_MODE){
+            handleUpdateGameMode(state, command);
+            return;
+        }
+
         if (command.getType() == CommandType.ROLL_DICE) {
             handleRollDice(state, command);
             return;
@@ -77,6 +84,25 @@ public class GameCommandService {
         }
 
         throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type for turn flow");
+    }
+
+    private void handleUpdateGameMode(GameRoomState state, ClientCommand command) {
+        if(state.getPhase() != GamePhase.LOBBY) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Gamemode can only be changed in lobby phase");
+        }
+
+        if(state.getHostId() == null || !state.getHostId().equals(command.getPlayerId())){
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Only the host can change the game mode");
+        }
+
+        GameMode selectedGameMode = command.getGameMode();
+
+        if(selectedGameMode == null){
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Game mode is required");
+        }
+
+        state.setGameMode(selectedGameMode);
+        state.setVersion(state.getVersion() + 1);
     }
 
     private void handleRollDice(GameRoomState state, ClientCommand command) {

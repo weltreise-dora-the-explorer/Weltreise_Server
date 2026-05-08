@@ -80,7 +80,25 @@ public class WebSocketBrokerController {
                     registerSession(headerAccessor, lobbyId, command.getPlayerId());
                     yield s;
                 }
-                case START_GAME -> lobbyService.startGame(lobbyId, command.getStops() != null ? command.getStops() : 12);
+                case UPDATE_GAME_MODE -> {
+                    GameRoomState existingState = lobbyStore.get(lobbyId)
+                            .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
+                    gameCommandService.processCommand(existingState, command);
+                    yield existingState;
+                }
+                case START_GAME -> {
+                    int stops = command.getStops() != null ? command.getStops() : 12;
+
+                    var existingState = lobbyStore.get(lobbyId);
+
+                    if (existingState != null
+                            && existingState.isPresent()
+                            && existingState.get().getGameMode() != null) {
+                        stops = existingState.get().getGameMode().getStops();
+                    }
+
+                    yield lobbyService.startGame(lobbyId, stops);
+                }
                 case ROLL_DICE, MOVE_TOKEN, MOVE_TO_CITY, END_TURN -> {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
                             .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));

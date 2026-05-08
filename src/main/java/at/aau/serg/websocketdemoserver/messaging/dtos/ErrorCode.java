@@ -21,5 +21,6 @@ public enum ErrorCode {
     INTERNAL_ERROR,
     LOBBY_FULL,
     CITY_NOT_FOUND,
-    INVALID_MOVE_TARGET
+    INVALID_MOVE_TARGET,
+    GAME_OVER
 }

@@ -4,13 +4,18 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameMode;
+import at.aau.serg.websocketdemoserver.messaging.dtos.GameOverMessage;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
+import at.aau.serg.websocketdemoserver.messaging.dtos.GoalReachedMessage;
+import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerScore;
 import at.aau.serg.websocketdemoserver.game.models.City;
 import at.aau.serg.websocketdemoserver.game.models.CityNode;
 import at.aau.serg.websocketdemoserver.game.models.Connection;
 import at.aau.serg.websocketdemoserver.game.models.PlayerState;
+import at.aau.serg.websocketdemoserver.websocket.broker.WebSocketTopics;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -27,24 +32,30 @@ public class GameCommandService {
     private final Random random;
     private final WorldGraph worldGraph;
     private final MovementEngine movementEngine;
+    private final GameSessionService gameSessionService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public GameCommandService() {
-        this(new Random(), loadWorldGraphSafe(), new MovementEngine());
+        this(new Random(), loadWorldGraphSafe(), new MovementEngine(), new GameSessionService(), null);
     }
 
     public GameCommandService(Random random) {
-        this(random, loadWorldGraphSafe(), new MovementEngine());
+        this(random, loadWorldGraphSafe(), new MovementEngine(), new GameSessionService(), null);
     }
 
     @Autowired
-    public GameCommandService(WorldGraph worldGraph, MovementEngine movementEngine) {
-        this(new Random(), worldGraph, movementEngine);
+    public GameCommandService(WorldGraph worldGraph, MovementEngine movementEngine,
+                               GameSessionService gameSessionService, SimpMessagingTemplate messagingTemplate) {
+        this(new Random(), worldGraph, movementEngine, gameSessionService, messagingTemplate);
     }
 
-    GameCommandService(Random random, WorldGraph worldGraph, MovementEngine movementEngine) {
+    GameCommandService(Random random, WorldGraph worldGraph, MovementEngine movementEngine,
+                       GameSessionService gameSessionService, SimpMessagingTemplate messagingTemplate) {
         this.random = Objects.requireNonNull(random, "random must not be null");
         this.worldGraph = Objects.requireNonNull(worldGraph, "worldGraph must not be null");
         this.movementEngine = Objects.requireNonNull(movementEngine, "movementEngine must not be null");
+        this.gameSessionService = Objects.requireNonNull(gameSessionService, "gameSessionService must not be null");
+        this.messagingTemplate = messagingTemplate;
     }
 
     private static WorldGraph loadWorldGraphSafe() {
@@ -58,7 +69,7 @@ public class GameCommandService {
     public void processCommand(GameRoomState state, ClientCommand command) {
         validateBase(state, command);
 
-        if(command.getType() == CommandType.UPDATE_GAME_MODE){
+        if (command.getType() == CommandType.UPDATE_GAME_MODE) {
             handleUpdateGameMode(state, command);
             return;
         }
@@ -87,17 +98,17 @@ public class GameCommandService {
     }
 
     private void handleUpdateGameMode(GameRoomState state, ClientCommand command) {
-        if(state.getPhase() != GamePhase.LOBBY) {
+        if (state.getPhase() != GamePhase.LOBBY) {
             throw new GameException(ErrorCode.INVALID_PHASE, "Gamemode can only be changed in lobby phase");
         }
 
-        if(state.getHostId() == null || !state.getHostId().equals(command.getPlayerId())){
+        if (state.getHostId() == null || !state.getHostId().equals(command.getPlayerId())) {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Only the host can change the game mode");
         }
 
         GameMode selectedGameMode = command.getGameMode();
 
-        if(selectedGameMode == null){
+        if (selectedGameMode == null) {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Game mode is required");
         }
 
@@ -188,7 +199,19 @@ public class GameCommandService {
         player.setRemainingSteps(newRemainingSteps);
 
         CityNode targetNode = chosenConnection.getDestination();
-        player.setCurrentCity(new City(targetNode.getId(), targetNode.getName(), targetNode.getContinent(), targetNode.getColor()));
+        City targetCity = new City(targetNode.getId(), targetNode.getName(), targetNode.getContinent(), targetNode.getColor());
+
+        int goalsBefore = player.getVisitedCities().size();
+        gameSessionService.visitCity(player, targetCity);
+
+        if (player.getVisitedCities().size() > goalsBefore) {
+            broadcastGoalReached(state, player, targetCity);
+        }
+
+        if (!state.isGameOver() && gameSessionService.isVictory(player)) {
+            state.setGameOver(true);
+            broadcastGameOver(state);
+        }
 
         if (newRemainingSteps <= 0) {
             player.setRemainingSteps(0);
@@ -221,6 +244,31 @@ public class GameCommandService {
         state.setCurrentPlayerId(nextPlayerId);
         state.setLastDiceValue(null);
         state.setVersion(state.getVersion() + 1);
+    }
+
+    private void broadcastGoalReached(GameRoomState state, PlayerState player, City city) {
+        if (messagingTemplate == null) return;
+        GoalReachedMessage message = new GoalReachedMessage(
+                player.getPlayerId(),
+                city.getName(),
+                player.getVisitedCities().size(),
+                player.getOwnedCities().size()
+        );
+        messagingTemplate.convertAndSend(WebSocketTopics.GOAL_REACHED, message);
+    }
+
+    private void broadcastGameOver(GameRoomState state) {
+        if (messagingTemplate == null) return;
+        List<PlayerScore> scores = state.getPlayers().stream()
+                .map(p -> new PlayerScore(p.getPlayerId(), calculateScore(p)))
+                .collect(Collectors.toList());
+        messagingTemplate.convertAndSend(WebSocketTopics.GAME_OVER, new GameOverMessage(scores));
+    }
+
+    int calculateScore(PlayerState player) {
+        int reached = player.getVisitedCities().size();
+        int remaining = player.getOwnedCities().size() - reached;
+        return reached - remaining;
     }
 
     private void recomputeValidMoveIds(GameRoomState state) {
@@ -280,6 +328,9 @@ public class GameCommandService {
     }
 
     private void validateTurnContext(GameRoomState state, ClientCommand command) {
+        if (state.isGameOver()) {
+            throw new GameException(ErrorCode.GAME_OVER, "Das Spiel ist bereits beendet");
+        }
         if (state.getPhase() != GamePhase.IN_TURN) {
             throw new GameException(ErrorCode.INVALID_PHASE, "Command not allowed in current phase");
         }

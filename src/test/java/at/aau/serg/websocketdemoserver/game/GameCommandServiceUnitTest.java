@@ -200,6 +200,19 @@ class GameCommandServiceUnitTest {
     }
 
 
+    @Test
+    void endTurnClearsValidMoveIds() {
+        GameCommandService service = new GameCommandService(new FixedRandom(2));
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.setLastDiceValue(3);
+        state.getPlayers().getFirst().setRemainingSteps(3);
+        state.setValidMoveIds(new ArrayList<>(List.of("some-city-id")));
+
+        service.processCommand(state, new ClientCommand(CommandType.END_TURN, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getValidMoveIds()).isEmpty();
+    }
+
     private GameRoomState inTurnState(List<PlayerState> players) {
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");

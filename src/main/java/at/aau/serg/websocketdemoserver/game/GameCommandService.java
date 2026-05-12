@@ -205,7 +205,7 @@ public class GameCommandService {
         gameSessionService.visitCity(player, targetCity);
 
         if (player.getVisitedCities().size() > goalsBefore) {
-            broadcastGoalReached(state, player, targetCity);
+            broadcastGoalReached(player, targetCity);
         }
 
         if (!state.isGameOver() && gameSessionService.isVictory(player)) {
@@ -243,10 +243,11 @@ public class GameCommandService {
         String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
         state.setCurrentPlayerId(nextPlayerId);
         state.setLastDiceValue(null);
+        recomputeValidMoveIds(state);
         state.setVersion(state.getVersion() + 1);
     }
 
-    private void broadcastGoalReached(GameRoomState state, PlayerState player, City city) {
+    private void broadcastGoalReached(PlayerState player, City city) {
         if (messagingTemplate == null) return;
         GoalReachedMessage message = new GoalReachedMessage(
                 player.getPlayerId(),

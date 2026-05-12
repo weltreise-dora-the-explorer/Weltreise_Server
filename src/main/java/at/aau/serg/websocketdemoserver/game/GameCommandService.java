@@ -215,6 +215,7 @@ public class GameCommandService {
 
         if (newRemainingSteps <= 0) {
             player.setRemainingSteps(0);
+            player.setPreviousCityId(null);
             String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
             state.setCurrentPlayerId(nextPlayerId);
             state.setLastDiceValue(null);

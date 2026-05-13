@@ -25,7 +25,8 @@ class TurnBasedDtosUnitTest {
                 CommandType.MOVE_TO_CITY,
                 CommandType.END_TURN,
                 CommandType.LEAVE_LOBBY,
-                CommandType.LOBBY_CLOSED
+                CommandType.LOBBY_CLOSED,
+                CommandType.RESET_LOBBY
         );
     }
 

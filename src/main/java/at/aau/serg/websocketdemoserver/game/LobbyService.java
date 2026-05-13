@@ -129,6 +129,34 @@ public class LobbyService {
         return state;
     }
 
+    public GameRoomState resetLobby(String lobbyId, String playerId) {
+        validatePlayerId(playerId);
+        GameRoomState state = lobbyStore.get(lobbyId)
+                .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
+
+        if (!playerId.equals(state.getHostId())) {
+            throw new GameException(ErrorCode.MISSING_PLAYER_ID, "Only the host can reset the lobby");
+        }
+
+        for (PlayerState player : state.getPlayers()) {
+            player.setStartCity(null);
+            player.setCurrentCity(null);
+            player.setPreviousCityId(null);
+            player.setBoardPosition(0);
+            player.setRemainingSteps(0);
+            player.getOwnedCities().clear();
+            player.getVisitedCities().clear();
+        }
+
+        state.setPhase(GamePhase.LOBBY);
+        state.setCurrentPlayerId(null);
+        state.setLastDiceValue(null);
+        state.getValidMoveIds().clear();
+        state.setGameOver(false);
+        state.setVersion(state.getVersion() + 1);
+        return state;
+    }
+
     private boolean containsPlayer(List<PlayerState> players, String playerId) {
         return players.stream().anyMatch(player -> playerId.equals(player.getPlayerId()));
     }

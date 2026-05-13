@@ -13,5 +13,6 @@ public enum CommandType {
     MOVE_TO_CITY,
     END_TURN,
     LEAVE_LOBBY,
-    LOBBY_CLOSED
+    LOBBY_CLOSED,
+    RESET_LOBBY
 }

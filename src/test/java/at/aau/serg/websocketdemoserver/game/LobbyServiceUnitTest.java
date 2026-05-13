@@ -286,4 +286,109 @@ class LobbyServiceUnitTest {
         assertThat(state.getPlayers().getFirst().getStartCity()).isNotNull();
         assertThat(state.getPlayers().getFirst().getCurrentCity()).isNotNull();
     }
+
+    // ========== RESET LOBBY TESTS ==========
+
+    @Test
+    void resetLobbySetsPhasBackToLobby() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1", 12);
+
+        GameRoomState state = service.resetLobby("lobby-1", "player-1");
+
+        assertThat(state.getPhase()).isEqualTo(GamePhase.LOBBY);
+    }
+
+    @Test
+    void resetLobbyClearsCurrentPlayerAndDice() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1", 12);
+
+        GameRoomState state = service.resetLobby("lobby-1", "player-1");
+
+        assertThat(state.getCurrentPlayerId()).isNull();
+        assertThat(state.getLastDiceValue()).isNull();
+    }
+
+    @Test
+    void resetLobbySetsGameOverToFalse() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1", 12);
+        GameRoomState state = store.get("lobby-1").orElseThrow();
+        state.setGameOver(true);
+
+        service.resetLobby("lobby-1", "player-1");
+
+        assertThat(state.isGameOver()).isFalse();
+    }
+
+    @Test
+    void resetLobbyKeepsAllPlayers() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1", 12);
+
+        GameRoomState state = service.resetLobby("lobby-1", "player-1");
+
+        assertThat(state.getPlayers()).hasSize(2);
+    }
+
+    @Test
+    void resetLobbyClosesCityDataForAllPlayers() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1", 12);
+
+        GameRoomState state = service.resetLobby("lobby-1", "player-1");
+
+        state.getPlayers().forEach(p -> {
+            assertThat(p.getStartCity()).isNull();
+            assertThat(p.getCurrentCity()).isNull();
+            assertThat(p.getOwnedCities()).isEmpty();
+            assertThat(p.getVisitedCities()).isEmpty();
+        });
+    }
+
+    @Test
+    void resetLobbyIncrementsVersion() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1", 12);
+        long versionBefore = store.get("lobby-1").orElseThrow().getVersion();
+
+        service.resetLobby("lobby-1", "player-1");
+
+        assertThat(store.get("lobby-1").orElseThrow().getVersion()).isGreaterThan(versionBefore);
+    }
+
+    @Test
+    void resetLobbyRejectsNonHost() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+
+        assertThatThrownBy(() -> service.resetLobby("lobby-1", "player-2"))
+                .isInstanceOf(GameException.class);
+    }
+
+    @Test
+    void resetLobbyRejectsNonExistentLobby() {
+        assertThatThrownBy(() -> service.resetLobby("non-existent", "player-1"))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("not found");
+    }
+
+    @Test
+    void resetLobbyKeepsGameMode() {
+        service.createLobby("lobby-1", "player-1");
+        service.joinLobby("lobby-1", "player-2");
+        service.startGame("lobby-1", 12);
+        var modeBefore = store.get("lobby-1").orElseThrow().getGameMode();
+
+        GameRoomState state = service.resetLobby("lobby-1", "player-1");
+
+        assertThat(state.getGameMode()).isEqualTo(modeBefore);
+    }
 }

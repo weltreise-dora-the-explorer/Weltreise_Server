@@ -18,9 +18,19 @@ import java.util.List;
 @AllArgsConstructor
 public class GameRoomState {
     private String lobbyId;
+    private String hostId;
     private List<PlayerState> players = new ArrayList<>();
     private GamePhase phase = GamePhase.LOBBY;
     private String currentPlayerId;
     private Integer lastDiceValue;
     private long version = 0L;
+    private List<String> validMoveIds = new ArrayList<>();
+
+    private GameMode gameMode = GameMode.CITY_HOPPER;
+    private boolean gameOver = false;
+
+    public GameRoomState(String lobbyId, String hostId, List<PlayerState> players,
+                         GamePhase phase, String currentPlayerId, Integer lastDiceValue, long version) {
+        this(lobbyId, hostId, players, phase, currentPlayerId, lastDiceValue, version, new ArrayList<>(), GameMode.CITY_HOPPER, false);
+    }
 }

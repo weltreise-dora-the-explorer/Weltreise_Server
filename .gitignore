@@ -19,3 +19,7 @@ buildNumber.properties
 
 # Mac
 .DS_Store
+
+# Environment files (Secrets)
+.env
+.env.*

@@ -19,9 +19,14 @@ class TurnBasedDtosUnitTest {
                 CommandType.CREATE_LOBBY,
                 CommandType.JOIN_LOBBY,
                 CommandType.START_GAME,
+                CommandType.UPDATE_GAME_MODE,
                 CommandType.ROLL_DICE,
                 CommandType.MOVE_TOKEN,
-                CommandType.LEAVE_LOBBY
+                CommandType.MOVE_TO_CITY,
+                CommandType.END_TURN,
+                CommandType.LEAVE_LOBBY,
+                CommandType.LOBBY_CLOSED,
+                CommandType.RESET_LOBBY
         );
     }
 
@@ -52,7 +57,7 @@ class TurnBasedDtosUnitTest {
 
     @Test
     void playerStateStoresProvidedValues() {
-        City vienna = new City("vienna", "Vienna", Continent.EUROPE, CityColor.RED);
+        City vienna = new City("vienna", "Vienna", Continent.EUROPE_AFRICA, CityColor.RED);
         PlayerState playerState = new PlayerState("player-1");
         playerState.setCurrentCity(vienna);
         playerState.setBoardPosition(12);
@@ -66,12 +71,13 @@ class TurnBasedDtosUnitTest {
     void gameRoomStateStoresProvidedValues() {
         List<PlayerState> players = new ArrayList<>();
         PlayerState p1 = new PlayerState("player-1");
-        p1.setCurrentCity(new City("vienna", "Vienna", Continent.EUROPE, CityColor.RED));
+        p1.setCurrentCity(new City("vienna", "Vienna", Continent.EUROPE_AFRICA, CityColor.RED));
         p1.setBoardPosition(2);
         players.add(p1);
 
         GameRoomState roomState = new GameRoomState(
                 "lobby-1",
+                null,
                 players,
                 GamePhase.IN_TURN,
                 "player-1",
@@ -106,7 +112,7 @@ class TurnBasedDtosUnitTest {
 
     @Test
     void playerStateIsAllTargetsReachedReturnsTrueWhenAllVisited() {
-        City vienna = new City("vienna", "Vienna", Continent.EUROPE, CityColor.RED);
+        City vienna = new City("vienna", "Vienna", Continent.EUROPE_AFRICA, CityColor.RED);
         PlayerState player = new PlayerState("player-1");
         player.getOwnedCities().add(vienna);
         player.getVisitedCities().add(vienna);

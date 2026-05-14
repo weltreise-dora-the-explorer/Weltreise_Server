@@ -24,9 +24,9 @@ class GameSessionServiceTest {
     void setup() {
         sessionService = new GameSessionService();
 
-        berlin = new City("berlin", "Berlin", Continent.EUROPE, CityColor.RED);
-        paris = new City("paris", "Paris", Continent.EUROPE, CityColor.RED);
-        rom = new City("rom", "Rom", Continent.EUROPE, CityColor.RED);
+        berlin = new City("berlin", "Berlin", Continent.EUROPE_AFRICA, CityColor.RED);
+        paris = new City("paris", "Paris", Continent.EUROPE_AFRICA, CityColor.RED);
+        rom = new City("rom", "Rom", Continent.EUROPE_AFRICA, CityColor.RED);
 
         player = new PlayerState("TestPlayer");
         player.setStartCity(berlin);

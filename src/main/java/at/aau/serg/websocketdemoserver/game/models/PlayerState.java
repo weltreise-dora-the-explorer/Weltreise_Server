@@ -19,6 +19,8 @@ public class PlayerState {
     private City startCity;
     private City currentCity;
     private int boardPosition;
+    private int remainingSteps;
+    private String previousCityId;
     private List<City> ownedCities = new ArrayList<>();
     private List<City> visitedCities = new ArrayList<>();
 

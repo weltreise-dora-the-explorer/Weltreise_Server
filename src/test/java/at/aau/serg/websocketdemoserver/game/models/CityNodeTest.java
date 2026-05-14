@@ -12,15 +12,15 @@ class CityNodeTest {
 
     @BeforeEach
     void setup() {
-        berlin = new CityNode("berlin", "Berlin", Continent.EUROPE, CityColor.RED);
-        paris  = new CityNode("paris",  "Paris",  Continent.EUROPE, CityColor.BLUE);
+        berlin = new CityNode("berlin", "Berlin", Continent.EUROPE_AFRICA, CityColor.RED);
+        paris  = new CityNode("paris",  "Paris",  Continent.EUROPE_AFRICA, CityColor.ORANGE);
     }
 
     @Test
     void getters_returnCorrectValues() {
         assertEquals("berlin",       berlin.getId());
         assertEquals("Berlin",       berlin.getName());
-        assertEquals(Continent.EUROPE, berlin.getContinent());
+        assertEquals(Continent.EUROPE_AFRICA, berlin.getContinent());
         assertEquals(CityColor.RED,   berlin.getColor());
     }
 
@@ -38,7 +38,7 @@ class CityNodeTest {
     @Test
     void addConnection_storesCorrectDestinationAndType() {
         berlin.addConnection(paris, ConnectionType.FLIGHT);
-        Connection conn = berlin.getConnections().get(0);
+        Connection conn = berlin.getConnections().getFirst();
 
         assertEquals("paris",           conn.getDestination().getId());
         assertEquals(ConnectionType.FLIGHT, conn.getType());
@@ -46,7 +46,7 @@ class CityNodeTest {
 
     @Test
     void addMultipleConnections_allAreStored() {
-        CityNode london = new CityNode("london", "London", Continent.EUROPE, CityColor.GREEN);
+        CityNode london = new CityNode("london", "London", Continent.EUROPE_AFRICA, CityColor.GREEN);
         berlin.addConnection(paris,  ConnectionType.TRAIN);
         berlin.addConnection(london, ConnectionType.FLIGHT);
 

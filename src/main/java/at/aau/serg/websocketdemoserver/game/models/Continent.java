@@ -1,11 +1,7 @@
 package at.aau.serg.websocketdemoserver.game.models;
 
 public enum Continent {
-    AFRICA,
+    EUROPE_AFRICA,
     ASIA,
-    EUROPE,
-    NORTH_AMERICA,
-    SOUTH_AMERICA,
-    OCEANIA,
-    ANTARCTICA
+    AMERICAS_OCEANIA
 }

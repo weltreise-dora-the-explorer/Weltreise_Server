@@ -83,6 +83,16 @@ public class GameCommandService {
             return;
         }
 
+        if(command.getType() == CommandType.START_MINIGAME){
+            handleStartMinigame(state, command);
+            return;
+        }
+
+        if(command.getType() == CommandType.FINISH_MINIGAME){
+            handleFinishMinigame(state, command);
+            return;
+        }
+
         throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type for turn flow");
     }
 
@@ -220,6 +230,66 @@ public class GameCommandService {
         String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
         state.setCurrentPlayerId(nextPlayerId);
         state.setLastDiceValue(null);
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleStartMinigame(GameRoomState state, ClientCommand command) {
+        validateTurnContext(state, command);
+
+        PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(player.getCurrentCity() == null) {
+            throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
+        }
+
+        boolean isTargetCity = player.getOwnedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+
+        if(!isTargetCity) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Minigame can only be started on a target city");
+        }
+
+        boolean alreadyCompleted = player.getVisitedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+
+        if(alreadyCompleted) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Target city is already completed");
+        }
+
+        state.setPhase(GamePhase.MINIGAME);
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleFinishMinigame(GameRoomState state, ClientCommand command) {
+        if(state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Minigame can only be finished during minigame phase");
+        }
+
+        if(state.getCurrentPlayerId() == null) {
+            throw new GameException(ErrorCode.CURRENT_PLAYER_NOT_SET, "Current player is not set");
+        }
+
+        if(!state.getCurrentPlayerId().equals(command.getPlayerId())) {
+            throw new GameException(ErrorCode.NOT_YOUR_TURN, "Only the current target player can finish the minigame prototype");
+        }
+
+        PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(player.getCurrentCity() == null) {
+            throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
+        }
+
+        boolean isTargetCity = player.getOwnedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+
+        if(!isTargetCity) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Current city is not a target city");
+        }
+
+        boolean alreadyCompleted = player.getVisitedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+
+        if(!alreadyCompleted) {
+            player.getVisitedCities().add(player.getCurrentCity());
+        }
+
+        state.setPhase(GamePhase.IN_TURN);
         state.setVersion(state.getVersion() + 1);
     }
 

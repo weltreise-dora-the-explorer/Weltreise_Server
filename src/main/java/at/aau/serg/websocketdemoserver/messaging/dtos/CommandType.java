@@ -12,6 +12,8 @@ public enum CommandType {
     MOVE_TOKEN,
     MOVE_TO_CITY,
     END_TURN,
+    START_MINIGAME,
+    FINISH_MINIGAME,
     LEAVE_LOBBY,
     LOBBY_CLOSED
 }

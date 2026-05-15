@@ -163,7 +163,36 @@ public class LobbyService {
             state.setLastDiceValue(null);
         }
 
+        // Wenn waehrend eines laufenden Spiels nur noch 1 Spieler uebrig ist,
+        // wird das Spiel beendet und in die Lobby-Phase zurueckgesetzt.
+        // Der uebrige Spieler kann auf neue Mitspieler warten.
+        if (state.getPlayers().size() == 1 && state.getPhase() != GamePhase.LOBBY) {
+            resetGameToLobbyPhase(state);
+        }
+
         return new LobbyLeaveResult(state, false);
+    }
+
+    /**
+     * Setzt einen aktiven Spielzustand zurueck auf Lobby-Phase: Phase=LOBBY,
+     * Spieler-Daten geleert (Staedte, Position), Spielzustaende verworfen.
+     * Spieler selbst bleiben in der Lobby.
+     */
+    private void resetGameToLobbyPhase(GameRoomState state) {
+        state.setPhase(GamePhase.LOBBY);
+        state.setCurrentPlayerId(null);
+        state.setLastDiceValue(null);
+        state.getValidMoveIds().clear();
+        state.setGameOver(false);
+        for (PlayerState player : state.getPlayers()) {
+            player.setStartCity(null);
+            player.setCurrentCity(null);
+            player.setPreviousCityId(null);
+            player.setBoardPosition(0);
+            player.setRemainingSteps(0);
+            player.getOwnedCities().clear();
+            player.getVisitedCities().clear();
+        }
     }
 
     public GameRoomState startGame(String lobbyId, int stops) {

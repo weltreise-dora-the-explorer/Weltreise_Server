@@ -219,12 +219,13 @@ class LobbyServiceUnitTest {
     void leaveLobbyDoesNotChangeTurnWhenNonCurrentPlayerLeaves() {
         service.createLobby("lobby-1", "player-1");
         service.joinLobby("lobby-1", "player-2");
+        service.joinLobby("lobby-1", "player-3");
         service.startGame("lobby-1", 12);
 
-        LobbyLeaveResult result = service.leaveLobby("lobby-1", "player-2");
+        LobbyLeaveResult result = service.leaveLobby("lobby-1", "player-3");
 
         assertThat(result.state().getCurrentPlayerId()).isEqualTo("player-1");
-        assertThat(result.state().getPlayers()).hasSize(1);
+        assertThat(result.state().getPlayers()).hasSize(2);
     }
 
     @Test
@@ -581,5 +582,65 @@ class LobbyServiceUnitTest {
 
         assertThat(result.state()).isNull();
         assertThat(result.lobbyClosed()).isFalse();
+    }
+
+    // ========== SINGLE-PLAYER-REMAINING AUTO-RESET ==========
+
+    @Test
+    void leaveLobbyResetsToLobbyPhaseWhenOnlyOnePlayerRemainsInActiveGame() {
+        service.createLobby("lobby-1", "host");
+        service.joinLobby("lobby-1", "guest");
+        service.startGame("lobby-1", 6);
+        // Phase is now IN_TURN, 2 players
+
+        LobbyLeaveResult result = service.leaveLobby("lobby-1", "guest");
+
+        assertThat(result.state().getPhase()).isEqualTo(GamePhase.LOBBY);
+        assertThat(result.state().getPlayers()).hasSize(1);
+        assertThat(result.state().getCurrentPlayerId()).isNull();
+        assertThat(result.state().getLastDiceValue()).isNull();
+        assertThat(result.lobbyClosed()).isFalse();
+    }
+
+    @Test
+    void leaveLobbyClearsPlayerCitiesWhenResettingToLobbyPhase() {
+        service.createLobby("lobby-1", "host");
+        service.joinLobby("lobby-1", "guest");
+        service.startGame("lobby-1", 6);
+        // Host has ownedCities + startCity nach startGame
+
+        service.leaveLobby("lobby-1", "guest");
+
+        var remainingHost = store.get("lobby-1").orElseThrow().getPlayers().getFirst();
+        assertThat(remainingHost.getOwnedCities()).isEmpty();
+        assertThat(remainingHost.getVisitedCities()).isEmpty();
+        assertThat(remainingHost.getStartCity()).isNull();
+        assertThat(remainingHost.getCurrentCity()).isNull();
+    }
+
+    @Test
+    void leaveLobbyDoesNotResetWhenMultiplePlayersRemainInActiveGame() {
+        service.createLobby("lobby-1", "host");
+        service.joinLobby("lobby-1", "guest1");
+        service.joinLobby("lobby-1", "guest2");
+        service.startGame("lobby-1", 6);
+        // Phase is IN_TURN, 3 players
+
+        LobbyLeaveResult result = service.leaveLobby("lobby-1", "guest2");
+
+        assertThat(result.state().getPhase()).isNotEqualTo(GamePhase.LOBBY);
+        assertThat(result.state().getPlayers()).hasSize(2);
+    }
+
+    @Test
+    void leaveLobbyDoesNotResetWhenAlreadyInLobbyPhase() {
+        service.createLobby("lobby-1", "host");
+        service.joinLobby("lobby-1", "guest");
+        // No startGame -> phase stays LOBBY
+
+        LobbyLeaveResult result = service.leaveLobby("lobby-1", "guest");
+
+        assertThat(result.state().getPhase()).isEqualTo(GamePhase.LOBBY);
+        assertThat(result.state().getPlayers()).hasSize(1);
     }
 }

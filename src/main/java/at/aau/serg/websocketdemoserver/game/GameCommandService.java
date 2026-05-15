@@ -27,24 +27,26 @@ public class GameCommandService {
     private final Random random;
     private final WorldGraph worldGraph;
     private final MovementEngine movementEngine;
+    private final CityDistributor cityDistributor;
 
     public GameCommandService() {
-        this(new Random(), loadWorldGraphSafe(), new MovementEngine());
+        this(new Random(), loadWorldGraphSafe(), new MovementEngine(), createLoadedCityDistributor());
     }
 
     public GameCommandService(Random random) {
-        this(random, loadWorldGraphSafe(), new MovementEngine());
+        this(random, loadWorldGraphSafe(), new MovementEngine(), createLoadedCityDistributor());
     }
 
     @Autowired
-    public GameCommandService(WorldGraph worldGraph, MovementEngine movementEngine) {
-        this(new Random(), worldGraph, movementEngine);
+    public GameCommandService(WorldGraph worldGraph, MovementEngine movementEngine, CityDistributor cityDistributor) {
+        this(new Random(), worldGraph, movementEngine, createLoadedCityDistributor());
     }
 
-    GameCommandService(Random random, WorldGraph worldGraph, MovementEngine movementEngine) {
+    GameCommandService(Random random, WorldGraph worldGraph, MovementEngine movementEngine, CityDistributor cityDistributor) {
         this.random = Objects.requireNonNull(random, "random must not be null");
         this.worldGraph = Objects.requireNonNull(worldGraph, "worldGraph must not be null");
         this.movementEngine = Objects.requireNonNull(movementEngine, "movementEngine must not be null");
+        this.cityDistributor = Objects.requireNonNull(cityDistributor, "cityDistributor must not be null");
     }
 
     private static WorldGraph loadWorldGraphSafe() {
@@ -53,6 +55,12 @@ public class GameCommandService {
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load WorldGraph from resources", e);
         }
+    }
+
+    private static CityDistributor createLoadedCityDistributor() {
+        CityDistributor distributor = new CityDistributor();
+        distributor.loadCitiesFromJson();
+        return distributor;
     }
 
     public void processCommand(GameRoomState state, ClientCommand command) {
@@ -200,6 +208,31 @@ public class GameCommandService {
         CityNode targetNode = chosenConnection.getDestination();
         player.setCurrentCity(new City(targetNode.getId(), targetNode.getName(), targetNode.getContinent(), targetNode.getColor()));
 
+        if(isCurrentCityOpenTarget(player)) {
+            state.setValidMoveIds(new ArrayList<>());
+
+            if(player.isHasVoucher()) {
+                player.getVisitedCities().add(player.getCurrentCity());
+                player.setHasVoucher(false);
+
+                if(newRemainingSteps <= 0) {
+                    player.setRemainingSteps(0);
+                    String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+                    state.setCurrentPlayerId(nextPlayerId);
+                    state.setLastDiceValue(null);
+                } else {
+                    recomputeValidMoveIds(state);
+                }
+
+                state.setVersion(state.getVersion() + 1);
+                return;
+            }
+
+            state.setPhase(GamePhase.MINIGAME);
+            state.setVersion(state.getVersion() + 1);
+            return;
+        }
+
         if (newRemainingSteps <= 0) {
             player.setRemainingSteps(0);
             String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
@@ -271,26 +304,92 @@ public class GameCommandService {
             throw new GameException(ErrorCode.NOT_YOUR_TURN, "Only the current target player can finish the minigame prototype");
         }
 
-        PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
+        PlayerState targetPlayer = findPlayerState(state.getPlayers(), command.getPlayerId());
 
-        if(player.getCurrentCity() == null) {
+        if(targetPlayer.getCurrentCity() == null) {
             throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
         }
 
-        boolean isTargetCity = player.getOwnedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+        boolean isTargetCity = targetPlayer.getOwnedCities().stream().anyMatch(city -> city.getId().equals(targetPlayer.getCurrentCity().getId()));
 
         if(!isTargetCity) {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Current city is not a target city");
         }
 
-        boolean alreadyCompleted = player.getVisitedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+        boolean alreadyCompleted = targetPlayer.getVisitedCities().stream().anyMatch(city -> city.getId().equals(targetPlayer.getCurrentCity().getId()));
 
-        if(!alreadyCompleted) {
-            player.getVisitedCities().add(player.getCurrentCity());
+        if(alreadyCompleted) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Target city is already completed");
+        }
+
+        String winnerPlayerId = command.getWinnerPlayerId();
+
+        if(winnerPlayerId == null) {
+            winnerPlayerId = command.getPlayerId();
+        }
+
+        PlayerState winner = findPlayerState(state.getPlayers(), winnerPlayerId);
+
+        if(winner.getPlayerId().equals(targetPlayer.getPlayerId())) {
+            targetPlayer.getVisitedCities().add(targetPlayer.getCurrentCity());
+        } else {
+            winner.setHasVoucher(true);
+            replaceCurrentTargetCity(state, targetPlayer);
+        }
+
+        if(targetPlayer.getRemainingSteps() <= 0) {
+            targetPlayer.setRemainingSteps(0);
+            String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+            state.setCurrentPlayerId(nextPlayerId);
+            state.setLastDiceValue(null);
+            state.setValidMoveIds(new ArrayList<>());
+        } else {
+            recomputeValidMoveIds(state);
         }
 
         state.setPhase(GamePhase.IN_TURN);
         state.setVersion(state.getVersion() + 1);
+    }
+
+    private boolean isCurrentCityOpenTarget(PlayerState player) {
+        if(player.getCurrentCity() == null) {
+            return false;
+        }
+
+        boolean isTargetCity = player.getOwnedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+
+        boolean alreadyCompleted = player.getVisitedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+
+        return isTargetCity && !alreadyCompleted;
+    }
+
+    private void replaceCurrentTargetCity(GameRoomState state, PlayerState targetPlayer) {
+        City lostCity = targetPlayer.getCurrentCity();
+
+        if(lostCity == null) {
+            throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
+        }
+
+        targetPlayer.getOwnedCities().removeIf(city -> city.getId().equals(lostCity.getId()));
+
+        City replacementCity = cityDistributor.getAllCities().stream()
+                .filter(city -> !city.getId().equals(lostCity.getId()))
+                .filter(city -> !containsCityById(targetPlayer.getOwnedCities(), city.getId()))
+                .filter(city -> !containsCityById(targetPlayer.getVisitedCities(), city.getId()))
+                .filter(city -> !isCityAssignedToAnyPlayer(state.getPlayers(), city.getId()))
+                .findFirst()
+                .orElseThrow(() -> new GameException(ErrorCode.INVALID_COMMAND, "No replacement city available"));
+
+        targetPlayer.getOwnedCities().add(replacementCity);
+    }
+
+    private boolean containsCityById(List<City> cities, String cityId) {
+        return cities.stream().anyMatch(city -> city.getId().equals(cityId));
+    }
+
+    private boolean isCityAssignedToAnyPlayer(List<PlayerState> players, String cityId) {
+        return players.stream()
+                .anyMatch(player -> containsCityById(player.getOwnedCities(), cityId));
     }
 
     private void recomputeValidMoveIds(GameRoomState state) {

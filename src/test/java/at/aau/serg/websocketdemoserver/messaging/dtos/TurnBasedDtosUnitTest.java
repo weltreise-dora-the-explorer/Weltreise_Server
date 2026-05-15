@@ -24,6 +24,8 @@ class TurnBasedDtosUnitTest {
                 CommandType.MOVE_TOKEN,
                 CommandType.MOVE_TO_CITY,
                 CommandType.END_TURN,
+                CommandType.START_MINIGAME,
+                CommandType.FINISH_MINIGAME,
                 CommandType.LEAVE_LOBBY,
                 CommandType.LOBBY_CLOSED
         );
@@ -34,7 +36,8 @@ class TurnBasedDtosUnitTest {
         assertThat(GamePhase.values()).containsExactly(
                 GamePhase.LOBBY,
                 GamePhase.CITY_ASSIGNMENT,
-                GamePhase.IN_TURN
+                GamePhase.IN_TURN,
+                GamePhase.MINIGAME
         );
     }
 

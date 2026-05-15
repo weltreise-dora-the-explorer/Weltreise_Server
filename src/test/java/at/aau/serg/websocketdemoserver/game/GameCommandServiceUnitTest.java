@@ -199,6 +199,96 @@ class GameCommandServiceUnitTest {
         assertThat(state.getVersion()).isEqualTo(0L);
     }
 
+    @Test
+    void startMinigameSetsPhaseToMinigameAndIncrementsVersion() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.getOwnedCities().add(player.getCurrentCity());
+
+        GameRoomState state = inTurnState(players);
+
+        service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getPhase()).isEqualTo(GamePhase.MINIGAME);
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void startMinigameRejectsWhenCurrentCityIsNotTargetCity() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("target city");
+    }
+
+    @Test
+    void startMinigameRejectsAlreadyCompletedTargetCity() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.getOwnedCities().add(player.getCurrentCity());
+        player.getVisitedCities().add(player.getCurrentCity());
+
+        GameRoomState state = inTurnState(players);
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("already completed");
+    }
+
+    @Test
+    void finishMinigameAddsCurrentTargetCityToVisitedCitiesAndReturnsToTurn() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.getOwnedCities().add(player.getCurrentCity());
+
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+
+        service.processCommand(state, new ClientCommand(CommandType.FINISH_MINIGAME, "lobby-1", "player-1", null, null));
+
+        assertThat(player.getVisitedCities()).containsExactly(player.getCurrentCity());
+        assertThat(state.getPhase()).isEqualTo(GamePhase.IN_TURN);
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void finishMinigameRejectsWhenNotInMinigamePhase() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.FINISH_MINIGAME, "lobby-1", "player-1", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("during minigame phase");
+    }
+
+    @Test
+    void finishMinigameRejectsNonCurrentPlayer() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.getOwnedCities().add(player.getCurrentCity());
+
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.FINISH_MINIGAME, "lobby-1", "player-2", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("current target player");
+    }
+
 
     private GameRoomState inTurnState(List<PlayerState> players) {
         GameRoomState state = new GameRoomState();

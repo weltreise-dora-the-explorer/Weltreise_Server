@@ -23,6 +23,7 @@ public class PlayerState {
     private String previousCityId;
     private List<City> ownedCities = new ArrayList<>();
     private List<City> visitedCities = new ArrayList<>();
+    private boolean hasVoucher;
 
     /**
      * Konstruktor nur mit playerId (für Lobby-Join).

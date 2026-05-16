@@ -99,7 +99,7 @@ public class WebSocketBrokerController {
 
                     yield lobbyService.startGame(lobbyId, stops);
                 }
-                case ROLL_DICE, MOVE_TOKEN, MOVE_TO_CITY, END_TURN -> {
+                case ROLL_DICE, MOVE_TOKEN, MOVE_TO_CITY, END_TURN, START_MINIGAME, FINISH_MINIGAME -> {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
                             .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
                     gameCommandService.processCommand(existingState, command);

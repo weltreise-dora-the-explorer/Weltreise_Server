@@ -4,8 +4,16 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.anyMap;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class InMemoryLobbyStoreUnitTest {
 
@@ -132,5 +140,68 @@ class InMemoryLobbyStoreUnitTest {
         assertThatThrownBy(() -> store.remove(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Lobby id is required");
+    }
+
+    // ========== PERSISTENCE INTEGRATION TESTS ==========
+
+    @Test
+    void postConstructLoadsStateFromPersistence() {
+        LobbyPersistence persistence = mock(LobbyPersistence.class);
+        GameRoomState seeded = new GameRoomState();
+        seeded.setLobbyId("seeded");
+        when(persistence.loadAll()).thenReturn(Map.of("seeded", seeded));
+
+        InMemoryLobbyStore storeWithPersistence = new InMemoryLobbyStore(persistence);
+        storeWithPersistence.loadFromPersistence();
+
+        assertThat(storeWithPersistence.get("seeded")).isPresent();
+        assertThat(storeWithPersistence.get("seeded").get().getLobbyId()).isEqualTo("seeded");
+    }
+
+    @Test
+    void putTriggersPersistenceSaveAll() {
+        LobbyPersistence persistence = mock(LobbyPersistence.class);
+        InMemoryLobbyStore storeWithPersistence = new InMemoryLobbyStore(persistence);
+        GameRoomState state = new GameRoomState();
+        state.setLobbyId("lobby-1");
+
+        storeWithPersistence.put("lobby-1", state);
+
+        verify(persistence).saveAll(anyMap());
+    }
+
+    @Test
+    void removeTriggersPersistenceSaveAll() {
+        LobbyPersistence persistence = mock(LobbyPersistence.class);
+        InMemoryLobbyStore storeWithPersistence = new InMemoryLobbyStore(persistence);
+        storeWithPersistence.put("lobby-1", new GameRoomState());
+        clearInvocations(persistence);
+
+        storeWithPersistence.remove("lobby-1");
+
+        verify(persistence).saveAll(anyMap());
+    }
+
+    @Test
+    void getOrCreateTriggersSaveOnlyOnNewLobby() {
+        LobbyPersistence persistence = mock(LobbyPersistence.class);
+        InMemoryLobbyStore storeWithPersistence = new InMemoryLobbyStore(persistence);
+
+        storeWithPersistence.getOrCreate("lobby-1");
+        verify(persistence, times(1)).saveAll(anyMap());
+
+        storeWithPersistence.getOrCreate("lobby-1");
+        verify(persistence, times(1)).saveAll(anyMap());
+    }
+
+    @Test
+    void noArgConstructorWorksWithoutPersistence() {
+        InMemoryLobbyStore plainStore = new InMemoryLobbyStore();
+        GameRoomState state = new GameRoomState();
+        state.setLobbyId("lobby-1");
+
+        plainStore.put("lobby-1", state);
+
+        assertThat(plainStore.get("lobby-1")).isPresent();
     }
 }

@@ -53,6 +53,7 @@ jobs:
             docker rm weltreise-server || true
             docker run -d \
               -p 53205:8080 \
+              -v /home/grp-1/weltreise-data:/data \
               --name weltreise-server \
               --restart unless-stopped \
               ghcr.io/$REGISTRY_USER/weltreise-server:latest

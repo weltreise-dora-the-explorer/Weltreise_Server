@@ -23,3 +23,6 @@ buildNumber.properties
 # Environment files (Secrets)
 .env
 .env.*
+
+# Runtime persistence (lobbies.json)
+data/

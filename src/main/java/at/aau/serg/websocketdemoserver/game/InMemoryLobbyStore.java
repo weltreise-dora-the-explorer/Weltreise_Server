@@ -66,6 +66,15 @@ public class InMemoryLobbyStore {
         triggerSave();
     }
 
+    /**
+     * Persistiert den aktuellen Stand der Map.
+     * Aufruf noetig, wenn ein GameRoomState in-place mutiert wurde
+     * (z.B. Spieler joined, dice geworfen), ohne dass put/remove aufgerufen wurde.
+     */
+    public void save() {
+        triggerSave();
+    }
+
     private void triggerSave() {
         if (persistence != null) {
             persistence.saveAll(lobbies);

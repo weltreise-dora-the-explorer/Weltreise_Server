@@ -1,9 +1,14 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Path;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -642,5 +647,33 @@ class LobbyServiceUnitTest {
 
         assertThat(result.state().getPhase()).isEqualTo(GamePhase.LOBBY);
         assertThat(result.state().getPlayers()).hasSize(1);
+    }
+
+    // ========== END-TO-END RECOVERY TEST ==========
+
+    @Test
+    void allPlayersAreRecoveredAfterServerRestart(@TempDir Path tempDir) {
+        LobbyPersistence persistence = new LobbyPersistence(tempDir.toString());
+        CityDistributor distributor = new CityDistributor();
+        distributor.loadCitiesFromJson();
+
+        // First "server run": host creates lobby, two guests join.
+        InMemoryLobbyStore storeRun1 = new InMemoryLobbyStore(persistence);
+        storeRun1.loadFromPersistence();
+        LobbyService serviceRun1 = new LobbyService(storeRun1, distributor);
+
+        serviceRun1.createLobby("recovery-lobby", "host-1");
+        serviceRun1.joinLobby("recovery-lobby", "guest-1");
+        serviceRun1.joinLobby("recovery-lobby", "guest-2");
+
+        // Second "server run": fresh instances pointing at the same data dir.
+        InMemoryLobbyStore storeRun2 = new InMemoryLobbyStore(persistence);
+        storeRun2.loadFromPersistence();
+
+        Optional<GameRoomState> recovered = storeRun2.get("recovery-lobby");
+        assertThat(recovered).isPresent();
+        assertThat(recovered.get().getPlayers())
+                .extracting(PlayerState::getPlayerId)
+                .containsExactlyInAnyOrder("host-1", "guest-1", "guest-2");
     }
 }

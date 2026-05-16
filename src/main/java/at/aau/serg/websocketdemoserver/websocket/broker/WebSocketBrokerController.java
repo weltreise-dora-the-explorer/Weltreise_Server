@@ -95,6 +95,7 @@ public class WebSocketBrokerController {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
                             .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
                     gameCommandService.processCommand(existingState, command);
+                    lobbyStore.save();
                     yield existingState;
                 }
                 case START_GAME -> {
@@ -115,6 +116,7 @@ public class WebSocketBrokerController {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
                             .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
                     gameCommandService.processCommand(existingState, command);
+                    lobbyStore.save();
                     yield existingState;
                 }
                 default -> throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type");

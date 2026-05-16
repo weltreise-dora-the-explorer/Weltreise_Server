@@ -204,4 +204,24 @@ class InMemoryLobbyStoreUnitTest {
 
         assertThat(plainStore.get("lobby-1")).isPresent();
     }
+
+    @Test
+    void saveTriggersPersistenceSaveAll() {
+        LobbyPersistence persistence = mock(LobbyPersistence.class);
+        InMemoryLobbyStore storeWithPersistence = new InMemoryLobbyStore(persistence);
+        storeWithPersistence.put("lobby-1", new GameRoomState());
+        clearInvocations(persistence);
+
+        storeWithPersistence.save();
+
+        verify(persistence).saveAll(anyMap());
+    }
+
+    @Test
+    void saveIsSafeNoOpWithoutPersistence() {
+        InMemoryLobbyStore plainStore = new InMemoryLobbyStore();
+
+        plainStore.save();
+        // no exception thrown, backward compat preserved
+    }
 }

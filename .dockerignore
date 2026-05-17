@@ -1,0 +1,27 @@
+# Maven build output
+target/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# CI/CD
+.github/
+
+# Documentation (nicht im Container nötig)
+README.md
+docs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Maven Wrapper (Maven kommt aus dem Base Image)
+.mvn/
+mvnw
+mvnw.cmd

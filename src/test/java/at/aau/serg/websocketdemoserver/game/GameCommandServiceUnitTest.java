@@ -403,6 +403,45 @@ class GameCommandServiceUnitTest {
     }
 
 
+    @Test
+    void previousCityIdClearedAfterAutoTurnSwitch_allowsReturnInNextTurn() {
+        // Single-player game so the auto-switch immediately returns to player-1.
+        // novosibirsk –train(1)– omsk: rolling 1 uses up all steps and triggers auto-switch.
+        GameCommandService service = new GameCommandService(new FixedRandom(0)); // dice always = 1
+        PlayerState p1 = new PlayerState("player-1");
+        p1.setCurrentCity(new City("novosibirsk", "Novosibirsk", Continent.ASIA, CityColor.ORANGE));
+        GameRoomState state = new GameRoomState();
+        state.setLobbyId("lobby-1");
+        state.setPlayers(new ArrayList<>(List.of(p1)));
+        state.setPhase(GamePhase.IN_TURN);
+        state.setCurrentPlayerId("player-1");
+
+        // Turn 1: roll 1, move novosibirsk → omsk (cost=1, steps hit 0 → auto-switch)
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
+        ClientCommand moveCmd = new ClientCommand(CommandType.MOVE_TO_CITY, "lobby-1", "player-1", null, null, "omsk", null, null);
+        service.processCommand(state, moveCmd);
+
+        // Auto-switch returns to player-1 (only player). previousCityId must be null now.
+        assertThat(p1.getPreviousCityId()).isNull();
+
+        // Turn 2: roll again — novosibirsk must appear in validMoveIds (no U-turn block)
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
+        assertThat(state.getValidMoveIds()).contains("novosibirsk");
+    }
+
+    @Test
+    void endTurnClearsValidMoveIds() {
+        GameCommandService service = new GameCommandService(new FixedRandom(2));
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.setLastDiceValue(3);
+        state.getPlayers().getFirst().setRemainingSteps(3);
+        state.setValidMoveIds(new ArrayList<>(List.of("some-city-id")));
+
+        service.processCommand(state, new ClientCommand(CommandType.END_TURN, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getValidMoveIds()).isEmpty();
+    }
+
     private GameRoomState inTurnState(List<PlayerState> players) {
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");

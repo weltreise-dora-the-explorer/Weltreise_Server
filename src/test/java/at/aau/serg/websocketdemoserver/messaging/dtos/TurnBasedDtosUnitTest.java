@@ -27,7 +27,8 @@ class TurnBasedDtosUnitTest {
                 CommandType.START_MINIGAME,
                 CommandType.FINISH_MINIGAME,
                 CommandType.LEAVE_LOBBY,
-                CommandType.LOBBY_CLOSED
+                CommandType.LOBBY_CLOSED,
+                CommandType.RESET_LOBBY
         );
     }
 

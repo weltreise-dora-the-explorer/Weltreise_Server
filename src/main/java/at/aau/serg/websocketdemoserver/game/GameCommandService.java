@@ -12,6 +12,11 @@ import at.aau.serg.websocketdemoserver.game.models.Connection;
 import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import at.aau.serg.websocketdemoserver.messaging.dtos.GameOverMessage;
+import at.aau.serg.websocketdemoserver.messaging.dtos.GoalReachedMessage;
+import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerScore;
+import at.aau.serg.websocketdemoserver.websocket.broker.WebSocketTopics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,25 +32,54 @@ public class GameCommandService {
     private final Random random;
     private final WorldGraph worldGraph;
     private final MovementEngine movementEngine;
+    private final GameSessionService gameSessionService;
+    private final SimpMessagingTemplate messagingTemplate;
     private final CityDistributor cityDistributor;
 
     public GameCommandService() {
-        this(new Random(), loadWorldGraphSafe(), new MovementEngine(), createLoadedCityDistributor());
+        this(new Random(), loadWorldGraphSafe(), new MovementEngine(), new GameSessionService(), null, createLoadedCityDistributor());
     }
 
     public GameCommandService(Random random) {
-        this(random, loadWorldGraphSafe(), new MovementEngine(), createLoadedCityDistributor());
+        this(random, loadWorldGraphSafe(), new MovementEngine(), new GameSessionService(), null, createLoadedCityDistributor());
     }
 
     @Autowired
-    public GameCommandService(WorldGraph worldGraph, MovementEngine movementEngine, CityDistributor cityDistributor) {
-        this(new Random(), worldGraph, movementEngine, createLoadedCityDistributor());
+    public GameCommandService(WorldGraph worldGraph, MovementEngine movementEngine, GameSessionService gameSessionService,
+                              SimpMessagingTemplate messagingTemplate,
+                              CityDistributor cityDistributor) {
+        this(new Random(), worldGraph, movementEngine, gameSessionService, messagingTemplate, cityDistributor);
     }
 
-    GameCommandService(Random random, WorldGraph worldGraph, MovementEngine movementEngine, CityDistributor cityDistributor) {
+    GameCommandService(Random random, WorldGraph worldGraph, MovementEngine movementEngine) {
+        this(random, worldGraph, movementEngine, new GameSessionService(), null, createLoadedCityDistributor());
+    }
+
+    GameCommandService(Random random,
+                       WorldGraph worldGraph,
+                       MovementEngine movementEngine,
+                       GameSessionService gameSessionService,
+                       SimpMessagingTemplate messagingTemplate) {
+        this(random, worldGraph, movementEngine, gameSessionService, messagingTemplate, createLoadedCityDistributor());
+    }
+
+    GameCommandService(Random random,
+                       GameSessionService gameSessionService,
+                       SimpMessagingTemplate messagingTemplate) {
+        this(random, loadWorldGraphSafe(), new MovementEngine(), gameSessionService, messagingTemplate, createLoadedCityDistributor());
+    }
+
+    GameCommandService(Random random,
+                       WorldGraph worldGraph,
+                       MovementEngine movementEngine,
+                       GameSessionService gameSessionService,
+                       SimpMessagingTemplate messagingTemplate,
+                       CityDistributor cityDistributor) {
         this.random = Objects.requireNonNull(random, "random must not be null");
         this.worldGraph = Objects.requireNonNull(worldGraph, "worldGraph must not be null");
         this.movementEngine = Objects.requireNonNull(movementEngine, "movementEngine must not be null");
+        this.gameSessionService = Objects.requireNonNull(gameSessionService, "gameSessionService must not be null");
+        this.messagingTemplate = messagingTemplate;
         this.cityDistributor = Objects.requireNonNull(cityDistributor, "cityDistributor must not be null");
     }
 
@@ -206,7 +240,8 @@ public class GameCommandService {
         player.setRemainingSteps(newRemainingSteps);
 
         CityNode targetNode = chosenConnection.getDestination();
-        player.setCurrentCity(new City(targetNode.getId(), targetNode.getName(), targetNode.getContinent(), targetNode.getColor()));
+        City targetCity = new City(targetNode.getId(), targetNode.getName(), targetNode.getContinent(), targetNode.getColor());
+        player.setCurrentCity(targetCity);
 
         if(isCurrentCityOpenTarget(player)) {
             state.setValidMoveIds(new ArrayList<>());
@@ -214,12 +249,20 @@ public class GameCommandService {
             if(player.isHasVoucher()) {
                 player.getVisitedCities().add(player.getCurrentCity());
                 player.setHasVoucher(false);
+                broadcastGoalReached(player, player.getCurrentCity());
+
+                if (!state.isGameOver() && gameSessionService.isVictory(player)) {
+                    state.setGameOver(true);
+                    broadcastGameOver(state);
+                }
 
                 if(newRemainingSteps <= 0) {
                     player.setRemainingSteps(0);
+                    player.setPreviousCityId(null);
                     String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
                     state.setCurrentPlayerId(nextPlayerId);
                     state.setLastDiceValue(null);
+                    state.setValidMoveIds(new ArrayList<>());
                 } else {
                     recomputeValidMoveIds(state);
                 }
@@ -233,8 +276,14 @@ public class GameCommandService {
             return;
         }
 
+        if (!state.isGameOver() && gameSessionService.isVictory(player)) {
+            state.setGameOver(true);
+            broadcastGameOver(state);
+        }
+
         if (newRemainingSteps <= 0) {
             player.setRemainingSteps(0);
+            player.setPreviousCityId(null);
             String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
             state.setCurrentPlayerId(nextPlayerId);
             state.setLastDiceValue(null);
@@ -263,6 +312,7 @@ public class GameCommandService {
         String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
         state.setCurrentPlayerId(nextPlayerId);
         state.setLastDiceValue(null);
+        recomputeValidMoveIds(state);
         state.setVersion(state.getVersion() + 1);
     }
 
@@ -275,13 +325,15 @@ public class GameCommandService {
             throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
         }
 
-        boolean isTargetCity = player.getOwnedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+        boolean isTargetCity = player.getOwnedCities().stream()
+                .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
 
         if(!isTargetCity) {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Minigame can only be started on a target city");
         }
 
-        boolean alreadyCompleted = player.getVisitedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+        boolean alreadyCompleted = player.getVisitedCities().stream()
+                .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
 
         if(alreadyCompleted) {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Target city is already completed");
@@ -310,13 +362,15 @@ public class GameCommandService {
             throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
         }
 
-        boolean isTargetCity = targetPlayer.getOwnedCities().stream().anyMatch(city -> city.getId().equals(targetPlayer.getCurrentCity().getId()));
+        boolean isTargetCity = targetPlayer.getOwnedCities().stream()
+                .anyMatch(city -> city.getId().equals(targetPlayer.getCurrentCity().getId()));
 
         if(!isTargetCity) {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Current city is not a target city");
         }
 
-        boolean alreadyCompleted = targetPlayer.getVisitedCities().stream().anyMatch(city -> city.getId().equals(targetPlayer.getCurrentCity().getId()));
+        boolean alreadyCompleted = targetPlayer.getVisitedCities().stream()
+                .anyMatch(city -> city.getId().equals(targetPlayer.getCurrentCity().getId()));
 
         if(alreadyCompleted) {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Target city is already completed");
@@ -332,6 +386,12 @@ public class GameCommandService {
 
         if(winner.getPlayerId().equals(targetPlayer.getPlayerId())) {
             targetPlayer.getVisitedCities().add(targetPlayer.getCurrentCity());
+            broadcastGoalReached(targetPlayer, targetPlayer.getCurrentCity());
+
+            if (!state.isGameOver() && gameSessionService.isVictory(targetPlayer)) {
+                state.setGameOver(true);
+                broadcastGameOver(state);
+            }
         } else {
             winner.setHasVoucher(true);
             replaceCurrentTargetCity(state, targetPlayer);
@@ -339,6 +399,7 @@ public class GameCommandService {
 
         if(targetPlayer.getRemainingSteps() <= 0) {
             targetPlayer.setRemainingSteps(0);
+            targetPlayer.setPreviousCityId(null);
             String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
             state.setCurrentPlayerId(nextPlayerId);
             state.setLastDiceValue(null);
@@ -356,11 +417,42 @@ public class GameCommandService {
             return false;
         }
 
-        boolean isTargetCity = player.getOwnedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+        boolean isTargetCity = player.getOwnedCities().stream()
+                .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
 
-        boolean alreadyCompleted = player.getVisitedCities().stream().anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+        boolean alreadyCompleted = player.getVisitedCities().stream()
+                .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
 
         return isTargetCity && !alreadyCompleted;
+    }
+
+    private void broadcastGoalReached(PlayerState player, City city) {
+        if (messagingTemplate == null) return;
+
+        GoalReachedMessage message = new GoalReachedMessage(
+                player.getPlayerId(),
+                city.getName(),
+                player.getVisitedCities().size(),
+                player.getOwnedCities().size()
+        );
+
+        messagingTemplate.convertAndSend(WebSocketTopics.GOAL_REACHED, message);
+    }
+
+    private void broadcastGameOver(GameRoomState state) {
+        if (messagingTemplate == null) return;
+
+        List<PlayerScore> scores = state.getPlayers().stream()
+                .map(player -> new PlayerScore(player.getPlayerId(), calculateScore(player)))
+                .collect(Collectors.toList());
+
+        messagingTemplate.convertAndSend(WebSocketTopics.GAME_OVER, new GameOverMessage(scores));
+    }
+
+    int calculateScore(PlayerState player) {
+        int reached = player.getVisitedCities().size();
+        int remaining = player.getOwnedCities().size() - reached;
+        return reached - remaining;
     }
 
     private void replaceCurrentTargetCity(GameRoomState state, PlayerState targetPlayer) {
@@ -449,6 +541,10 @@ public class GameCommandService {
     }
 
     private void validateTurnContext(GameRoomState state, ClientCommand command) {
+        if (state.isGameOver()) {
+            throw new GameException(ErrorCode.GAME_OVER, "Das Spiel ist bereits beendet");
+        }
+
         if (state.getPhase() != GamePhase.IN_TURN) {
             throw new GameException(ErrorCode.INVALID_PHASE, "Command not allowed in current phase");
         }

@@ -15,5 +15,6 @@ public enum CommandType {
     START_MINIGAME,
     FINISH_MINIGAME,
     LEAVE_LOBBY,
-    LOBBY_CLOSED
+    LOBBY_CLOSED,
+    RESET_LOBBY
 }

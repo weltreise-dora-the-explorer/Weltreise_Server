@@ -69,6 +69,7 @@ public class LobbyService {
 
         state.getPlayers().add(new PlayerState(playerId, clientId));
         state.setVersion(state.getVersion() + 1);
+        lobbyStore.save();
         return state;
     }
 
@@ -86,6 +87,7 @@ public class LobbyService {
 
         player.setConnected(false);
         state.setVersion(state.getVersion() + 1);
+        lobbyStore.save();
         return state;
     }
 
@@ -111,6 +113,7 @@ public class LobbyService {
 
         player.setConnected(true);
         state.setVersion(state.getVersion() + 1);
+        lobbyStore.save();
         return state;
     }
 
@@ -170,6 +173,7 @@ public class LobbyService {
             resetGameToLobbyPhase(state);
         }
 
+        lobbyStore.save();
         return new LobbyLeaveResult(state, false);
     }
 
@@ -224,6 +228,7 @@ public class LobbyService {
         state.setCurrentPlayerId(state.getPlayers().getFirst().getPlayerId());
         state.setLastDiceValue(null);
         state.setVersion(state.getVersion() + 1);
+        lobbyStore.save();
         return state;
     }
 
@@ -252,6 +257,7 @@ public class LobbyService {
         state.getValidMoveIds().clear();
         state.setGameOver(false);
         state.setVersion(state.getVersion() + 1);
+        lobbyStore.save();
         return state;
     }
 

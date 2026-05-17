@@ -16,6 +16,8 @@ import java.util.List;
 @AllArgsConstructor
 public class PlayerState {
     private String playerId;
+    private String clientId;
+    private boolean connected = true;
     private City startCity;
     private City currentCity;
     private int boardPosition;
@@ -29,6 +31,14 @@ public class PlayerState {
      */
     public PlayerState(String playerId) {
         this.playerId = playerId;
+    }
+
+    /**
+     * Konstruktor mit playerId und clientId (für Lobby-Join mit Gerätekennung).
+     */
+    public PlayerState(String playerId, String clientId) {
+        this.playerId = playerId;
+        this.clientId = clientId;
     }
 
     /**

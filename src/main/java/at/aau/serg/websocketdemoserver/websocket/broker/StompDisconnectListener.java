@@ -17,11 +17,16 @@ public class StompDisconnectListener {
     private final SessionRegistry sessionRegistry;
     private final LobbyService lobbyService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final DisconnectScheduler disconnectScheduler;
 
-    public StompDisconnectListener(SessionRegistry sessionRegistry, LobbyService lobbyService, SimpMessagingTemplate messagingTemplate) {
+    public StompDisconnectListener(SessionRegistry sessionRegistry,
+                                   LobbyService lobbyService,
+                                   SimpMessagingTemplate messagingTemplate,
+                                   DisconnectScheduler disconnectScheduler) {
         this.sessionRegistry = sessionRegistry;
         this.lobbyService = lobbyService;
         this.messagingTemplate = messagingTemplate;
+        this.disconnectScheduler = disconnectScheduler;
     }
 
     @EventListener
@@ -29,17 +34,29 @@ public class StompDisconnectListener {
         String sessionId = event.getSessionId();
         sessionRegistry.get(sessionId).ifPresent(info -> {
             try {
-                LobbyLeaveResult result = lobbyService.leaveLobby(info.lobbyId(), info.playerId());
-                CommandType responseType = result.lobbyClosed() ? CommandType.LOBBY_CLOSED : CommandType.LEAVE_LOBBY;
-                CommandResponse response = new CommandResponse(
-                        true, "OK", null, info.lobbyId(), responseType, result.state()
-                );
-                messagingTemplate.convertAndSend("/topic/lobby/" + info.lobbyId() + "/events", response);
+                GameRoomState state = lobbyService.markPlayerDisconnected(info.lobbyId(), info.playerId());
+                broadcast(info.lobbyId(), CommandType.PLAYER_DISCONNECTED, state);
+                disconnectScheduler.schedule(info.lobbyId(), info.playerId(),
+                        () -> handleGracePeriodExpired(info.lobbyId(), info.playerId()));
             } catch (GameException ignored) {
                 // Lobby already gone or player already removed — nothing to broadcast
             } finally {
                 sessionRegistry.remove(sessionId);
             }
         });
+    }
+
+    private void handleGracePeriodExpired(String lobbyId, String playerId) {
+        LobbyLeaveResult result = lobbyService.removeDisconnectedPlayer(lobbyId, playerId);
+        if (result.state() == null) {
+            return;
+        }
+        CommandType responseType = result.lobbyClosed() ? CommandType.LOBBY_CLOSED : CommandType.LEAVE_LOBBY;
+        broadcast(lobbyId, responseType, result.state());
+    }
+
+    private void broadcast(String lobbyId, CommandType type, GameRoomState state) {
+        CommandResponse response = new CommandResponse(true, "OK", null, lobbyId, type, state);
+        messagingTemplate.convertAndSend("/topic/lobby/" + lobbyId + "/events", response);
     }
 }

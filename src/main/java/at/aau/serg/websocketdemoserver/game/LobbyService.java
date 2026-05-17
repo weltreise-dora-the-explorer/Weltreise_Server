@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
 
 /**
@@ -30,6 +31,10 @@ public class LobbyService {
     }
 
     public GameRoomState createLobby(String lobbyId, String playerId) {
+        return createLobby(lobbyId, playerId, null);
+    }
+
+    public GameRoomState createLobby(String lobbyId, String playerId, String clientId) {
         validatePlayerId(playerId);
         if (lobbyStore.get(lobbyId).isPresent()) {
             throw new GameException(ErrorCode.GAME_ALREADY_STARTED, "Lobby already exists");
@@ -37,12 +42,16 @@ public class LobbyService {
         GameRoomState newLobby = new GameRoomState();
         newLobby.setLobbyId(lobbyId);
         newLobby.setHostId(playerId);
-        newLobby.getPlayers().add(new PlayerState(playerId));
+        newLobby.getPlayers().add(new PlayerState(playerId, clientId));
         lobbyStore.put(lobbyId, newLobby);
         return newLobby;
     }
 
     public GameRoomState joinLobby(String lobbyId, String playerId) {
+        return joinLobby(lobbyId, playerId, null);
+    }
+
+    public GameRoomState joinLobby(String lobbyId, String playerId, String clientId) {
         validatePlayerId(playerId);
         GameRoomState state = lobbyStore.get(lobbyId).orElseThrow(() ->
             new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby does not exist. Please check the Game PIN!")
@@ -58,9 +67,69 @@ public class LobbyService {
             throw new GameException(ErrorCode.PLAYER_ALREADY_JOINED, "Player already joined lobby");
         }
 
-        state.getPlayers().add(new PlayerState(playerId));
+        state.getPlayers().add(new PlayerState(playerId, clientId));
         state.setVersion(state.getVersion() + 1);
         return state;
+    }
+
+    /**
+     * Markiert einen Spieler als disconnected, ohne ihn aus der Lobby zu entfernen.
+     * Wird bei WebSocket-Disconnect aufgerufen; Spieler hat Grace Period zum Reconnect.
+     */
+    public GameRoomState markPlayerDisconnected(String lobbyId, String playerId) {
+        validatePlayerId(playerId);
+        GameRoomState state = lobbyStore.get(lobbyId)
+                .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
+
+        PlayerState player = findPlayer(state.getPlayers(), playerId)
+                .orElseThrow(() -> new GameException(ErrorCode.PLAYER_NOT_IN_LOBBY, "Player is not in lobby"));
+
+        player.setConnected(false);
+        state.setVersion(state.getVersion() + 1);
+        return state;
+    }
+
+    /**
+     * Bringt einen disconnecteten Spieler zurück in die Lobby.
+     * Validiert clientId, setzt connected=true und gibt aktuellen State zurück.
+     */
+    public GameRoomState rejoinLobby(String lobbyId, String playerId, String clientId) {
+        validatePlayerId(playerId);
+        GameRoomState state = lobbyStore.get(lobbyId)
+                .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
+
+        PlayerState player = findPlayer(state.getPlayers(), playerId)
+                .orElseThrow(() -> new GameException(ErrorCode.PLAYER_NOT_IN_LOBBY, "Player is not in lobby"));
+
+        if (clientId != null && player.getClientId() != null && !clientId.equals(player.getClientId())) {
+            throw new GameException(ErrorCode.PLAYER_NOT_IN_LOBBY, "Client id mismatch");
+        }
+
+        if (player.getClientId() == null && clientId != null) {
+            player.setClientId(clientId);
+        }
+
+        player.setConnected(true);
+        state.setVersion(state.getVersion() + 1);
+        return state;
+    }
+
+    /**
+     * Entfernt einen disconnecteten Spieler endgültig aus der Lobby (nach Grace Period).
+     * Wirkt wie leaveLobby, aber wirft keine Exception falls Spieler/Lobby schon weg sind.
+     */
+    public LobbyLeaveResult removeDisconnectedPlayer(String lobbyId, String playerId) {
+        if (playerId == null || playerId.isBlank()) {
+            return new LobbyLeaveResult(null, false);
+        }
+        if (lobbyStore.get(lobbyId).isEmpty()) {
+            return new LobbyLeaveResult(null, false);
+        }
+        try {
+            return leaveLobby(lobbyId, playerId);
+        } catch (GameException ex) {
+            return new LobbyLeaveResult(null, false);
+        }
     }
 
     public LobbyLeaveResult leaveLobby(String lobbyId, String playerId) {
@@ -94,7 +163,36 @@ public class LobbyService {
             state.setLastDiceValue(null);
         }
 
+        // Wenn waehrend eines laufenden Spiels nur noch 1 Spieler uebrig ist,
+        // wird das Spiel beendet und in die Lobby-Phase zurueckgesetzt.
+        // Der uebrige Spieler kann auf neue Mitspieler warten.
+        if (state.getPlayers().size() == 1 && state.getPhase() != GamePhase.LOBBY) {
+            resetGameToLobbyPhase(state);
+        }
+
         return new LobbyLeaveResult(state, false);
+    }
+
+    /**
+     * Setzt einen aktiven Spielzustand zurueck auf Lobby-Phase: Phase=LOBBY,
+     * Spieler-Daten geleert (Staedte, Position), Spielzustaende verworfen.
+     * Spieler selbst bleiben in der Lobby.
+     */
+    private void resetGameToLobbyPhase(GameRoomState state) {
+        state.setPhase(GamePhase.LOBBY);
+        state.setCurrentPlayerId(null);
+        state.setLastDiceValue(null);
+        state.getValidMoveIds().clear();
+        state.setGameOver(false);
+        for (PlayerState player : state.getPlayers()) {
+            player.setStartCity(null);
+            player.setCurrentCity(null);
+            player.setPreviousCityId(null);
+            player.setBoardPosition(0);
+            player.setRemainingSteps(0);
+            player.getOwnedCities().clear();
+            player.getVisitedCities().clear();
+        }
     }
 
     public GameRoomState startGame(String lobbyId, int stops) {
@@ -168,6 +266,12 @@ public class LobbyService {
             }
         }
         return -1;
+    }
+
+    private Optional<PlayerState> findPlayer(List<PlayerState> players, String playerId) {
+        return players.stream()
+                .filter(player -> playerId.equals(player.getPlayerId()))
+                .findFirst();
     }
 
     private void validatePlayerId(String playerId) {

@@ -268,9 +268,7 @@ public class GameCommandService {
     }
 
     int calculateScore(PlayerState player) {
-        int reached = player.getVisitedCities().size();
-        int remaining = player.getOwnedCities().size() - reached;
-        return reached - remaining;
+        return player.getVisitedCities().size();
     }
 
     private void recomputeValidMoveIds(GameRoomState state) {

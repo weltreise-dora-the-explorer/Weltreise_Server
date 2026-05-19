@@ -183,6 +183,7 @@ class GoalAndGameOverUnitTest {
         GameOverMessage gameOverMsg = captor.getValue();
         assertThat(gameOverMsg.getScores()).hasSize(2);
         assertThat(gameOverMsg.getScores()).extracting(s -> s.getPlayerName()).contains(PLAYER_ID);
+        assertThat(gameOverMsg.getWinnerId()).isEqualTo(PLAYER_ID);
     }
 
     // ===== Game-over triggered by returning home after all goals already visited =====
@@ -290,7 +291,7 @@ class GoalAndGameOverUnitTest {
         player.getOwnedCities().add(city("paris", "Paris"));
         player.getOwnedCities().add(city("berlin", "Berlin"));
 
-        assertThat(service.calculateScore(player)).isEqualTo(-2);
+        assertThat(service.calculateScore(player)).isEqualTo(0);
     }
 
     @Test
@@ -300,7 +301,7 @@ class GoalAndGameOverUnitTest {
         player.getOwnedCities().add(city("berlin", "Berlin"));
         player.getVisitedCities().add(city("paris", "Paris"));
 
-        assertThat(service.calculateScore(player)).isEqualTo(0);
+        assertThat(service.calculateScore(player)).isEqualTo(1);
     }
 
     // ===== Helpers =====

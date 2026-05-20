@@ -26,6 +26,7 @@ class TurnBasedDtosUnitTest {
                 CommandType.END_TURN,
                 CommandType.START_MINIGAME,
                 CommandType.FINISH_MINIGAME,
+                CommandType.USE_FREE_PASS,
                 CommandType.LEAVE_LOBBY,
                 CommandType.LOBBY_CLOSED,
                 CommandType.RESET_LOBBY,

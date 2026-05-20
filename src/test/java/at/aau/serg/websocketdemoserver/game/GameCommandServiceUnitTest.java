@@ -265,7 +265,7 @@ class GameCommandServiceUnitTest {
         service.processCommand(state, command);
 
         assertThat(targetPlayer.getVisitedCities()).containsExactly(targetPlayer.getCurrentCity());
-        assertThat(targetPlayer.isHasVoucher()).isFalse();
+        assertThat(targetPlayer.getFreePassCount()).isZero();
         assertThat(state.getPhase()).isEqualTo(GamePhase.IN_TURN);
         assertThat(state.getVersion()).isEqualTo(1L);
     }
@@ -296,7 +296,7 @@ class GameCommandServiceUnitTest {
         service.processCommand(state, command);
 
         assertThat(targetPlayer.getVisitedCities()).isEmpty();
-        assertThat(winner.isHasVoucher()).isTrue();
+        assertThat(winner.getFreePassCount()).isEqualTo(1);
 
         assertThat(targetPlayer.getOwnedCities()).hasSize(1);
         assertThat(targetPlayer.getOwnedCities())

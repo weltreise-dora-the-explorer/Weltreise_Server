@@ -20,6 +20,7 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,20 +36,24 @@ class LobbyCommandFlowIntegrationTest {
 
     @Test
     void coreLobbyFlowHandlesJoinStartRollAndMove() throws Exception {
-        String lobbyId = "integration-lobby-a";
+        String lobbyId = "integration-lobby-a" + UUID.randomUUID();
         BlockingQueue<CommandResponse> messages = new LinkedBlockingDeque<>();
         StompSession session = initSession("/topic/lobby/" + lobbyId + "/events", messages);
 
-        session.send("/app/lobby/" + lobbyId + "/command",
-                new ClientCommand(CommandType.CREATE_LOBBY, null, "player-1", null, null));
+        ClientCommand createCommand = new ClientCommand(CommandType.CREATE_LOBBY, null, "player-1", null, null);
+        createCommand.setClientId("client-1");
+
+        session.send("/app/lobby/" + lobbyId + "/command", createCommand);
         CommandResponse create = messages.poll(1, TimeUnit.SECONDS);
         assertThat(create).isNotNull();
         assertThat(create.isSuccess()).isTrue();
         assertThat(create.getCommandType()).isEqualTo(CommandType.CREATE_LOBBY);
         assertThat(create.getState().getPlayers()).hasSize(1);
 
-        session.send("/app/lobby/" + lobbyId + "/command",
-                new ClientCommand(CommandType.JOIN_LOBBY, null, "player-2", null, null));
+        ClientCommand joinCommand = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-2", null, null);
+        joinCommand.setClientId("client-2");
+
+        session.send("/app/lobby/" + lobbyId + "/command", joinCommand);
         CommandResponse joinTwo = messages.poll(1, TimeUnit.SECONDS);
         assertThat(joinTwo).isNotNull();
         assertThat(joinTwo.isSuccess()).isTrue();
@@ -80,7 +85,7 @@ class LobbyCommandFlowIntegrationTest {
 
     @Test
     void commandFlowReturnsLobbyNotFoundForTurnCommandWithoutLobby() throws Exception {
-        String lobbyId = "integration-lobby-missing";
+        String lobbyId = "integration-lobby-missing" + UUID.randomUUID();
         BlockingQueue<CommandResponse> messages = new LinkedBlockingDeque<>();
         StompSession session = initSession("/topic/lobby/" + lobbyId + "/events", messages);
 
@@ -95,7 +100,7 @@ class LobbyCommandFlowIntegrationTest {
 
     @Test
     void commandFlowReturnsMissingCommandTypeWhenTypeIsNull() throws Exception {
-        String lobbyId = "integration-lobby-b";
+        String lobbyId = "integration-lobby-b" + UUID.randomUUID();
         BlockingQueue<CommandResponse> messages = new LinkedBlockingDeque<>();
         StompSession session = initSession("/topic/lobby/" + lobbyId + "/events", messages);
 

@@ -251,6 +251,11 @@ public class GameCommandService {
         if(isCurrentCityOpenTarget(player)) {
             state.setValidMoveIds(new ArrayList<>());
 
+            if(player.getFreePassCount() > 0){
+                state.setVersion(state.getVersion() + 1);
+                return;
+            }
+
             state.setPhase(GamePhase.MINIGAME);
             state.setVersion(state.getVersion() + 1);
             return;
@@ -373,8 +378,8 @@ public class GameCommandService {
                 broadcastGameOver(state);
             }
         } else {
-            winner.setFreePassCount(winner.getFreePassCount() + 1);
             replaceCurrentTargetCity(state, targetPlayer);
+            winner.setFreePassCount(winner.getFreePassCount() + 1);
         }
 
         if(targetPlayer.getRemainingSteps() <= 0) {
@@ -475,7 +480,7 @@ public class GameCommandService {
         return reached - remaining;
     }
 
-    private void replaceCurrentTargetCity(GameRoomState state, PlayerState targetPlayer) {
+    private City replaceCurrentTargetCity(GameRoomState state, PlayerState targetPlayer) {
         City lostCity = targetPlayer.getCurrentCity();
 
         if(lostCity == null) {
@@ -493,6 +498,8 @@ public class GameCommandService {
                 .orElseThrow(() -> new GameException(ErrorCode.INVALID_COMMAND, "No replacement city available"));
 
         targetPlayer.getOwnedCities().add(replacementCity);
+
+        return replacementCity;
     }
 
     private boolean containsCityById(List<City> cities, String cityId) {

@@ -418,7 +418,7 @@ class GameCommandServiceUnitTest {
 
         // Turn 1: roll 1, move novosibirsk → omsk (cost=1, steps hit 0 → auto-switch)
         service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
-        ClientCommand moveCmd = new ClientCommand(CommandType.MOVE_TO_CITY, "lobby-1", "player-1", null, null, "omsk", null, null);
+        ClientCommand moveCmd = new ClientCommand(CommandType.MOVE_TO_CITY, "lobby-1", "player-1", null, null, "omsk", null, null, null);
         service.processCommand(state, moveCmd);
 
         // Auto-switch returns to player-1 (only player). previousCityId must be null now.

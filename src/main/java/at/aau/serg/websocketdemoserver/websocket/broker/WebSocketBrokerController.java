@@ -28,15 +28,18 @@ public class WebSocketBrokerController {
     private final GameCommandService gameCommandService;
     private final InMemoryLobbyStore lobbyStore;
     private final SessionRegistry sessionRegistry;
+    private final DisconnectScheduler disconnectScheduler;
 
     public WebSocketBrokerController(LobbyService lobbyService,
                                      GameCommandService gameCommandService,
                                      InMemoryLobbyStore lobbyStore,
-                                     SessionRegistry sessionRegistry) {
+                                     SessionRegistry sessionRegistry,
+                                     DisconnectScheduler disconnectScheduler) {
         this.lobbyService = lobbyService;
         this.gameCommandService = gameCommandService;
         this.lobbyStore = lobbyStore;
         this.sessionRegistry = sessionRegistry;
+        this.disconnectScheduler = disconnectScheduler;
     }
 
     @MessageMapping("/hello")
@@ -65,18 +68,26 @@ public class WebSocketBrokerController {
             if (commandType == CommandType.LEAVE_LOBBY) {
                 LobbyLeaveResult result = lobbyService.leaveLobby(lobbyId, command.getPlayerId());
                 unregisterSession(headerAccessor);
+                disconnectScheduler.cancel(lobbyId, command.getPlayerId());
                 CommandType responseType = result.lobbyClosed() ? CommandType.LOBBY_CLOSED : CommandType.LEAVE_LOBBY;
                 return new CommandResponse(true, "OK", null, lobbyId, responseType, result.state());
             }
 
+            if (commandType == CommandType.REJOIN_LOBBY) {
+                GameRoomState state = lobbyService.rejoinLobby(lobbyId, command.getPlayerId(), command.getClientId());
+                disconnectScheduler.cancel(lobbyId, command.getPlayerId());
+                registerSession(headerAccessor, lobbyId, command.getPlayerId());
+                return new CommandResponse(true, "OK", null, lobbyId, CommandType.PLAYER_RECONNECTED, state);
+            }
+
             GameRoomState state = switch (commandType) {
                 case CREATE_LOBBY -> {
-                    GameRoomState s = lobbyService.createLobby(lobbyId, command.getPlayerId());
+                    GameRoomState s = lobbyService.createLobby(lobbyId, command.getPlayerId(), command.getClientId());
                     registerSession(headerAccessor, lobbyId, command.getPlayerId());
                     yield s;
                 }
                 case JOIN_LOBBY -> {
-                    GameRoomState s = lobbyService.joinLobby(lobbyId, command.getPlayerId());
+                    GameRoomState s = lobbyService.joinLobby(lobbyId, command.getPlayerId(), command.getClientId());
                     registerSession(headerAccessor, lobbyId, command.getPlayerId());
                     yield s;
                 }
@@ -84,6 +95,7 @@ public class WebSocketBrokerController {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
                             .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
                     gameCommandService.processCommand(existingState, command);
+                    lobbyStore.save();
                     yield existingState;
                 }
                 case START_GAME -> {
@@ -105,6 +117,7 @@ public class WebSocketBrokerController {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
                             .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
                     gameCommandService.processCommand(existingState, command);
+                    lobbyStore.save();
                     yield existingState;
                 }
                 default -> throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type");

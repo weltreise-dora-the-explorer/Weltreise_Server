@@ -331,7 +331,7 @@ class GoalAndGameOverUnitTest {
     }
 
     private ClientCommand moveToCityCommand(String targetCityId) {
-        return new ClientCommand(CommandType.MOVE_TO_CITY, LOBBY_ID, PLAYER_ID, null, null, targetCityId, null, null);
+        return new ClientCommand(CommandType.MOVE_TO_CITY, LOBBY_ID, PLAYER_ID, null, null, targetCityId, null, null, null);
     }
 
     private GameRoomState inTurnState(List<PlayerState> players) {

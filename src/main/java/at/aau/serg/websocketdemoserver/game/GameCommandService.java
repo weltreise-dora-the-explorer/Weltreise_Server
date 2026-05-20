@@ -135,6 +135,11 @@ public class GameCommandService {
             return;
         }
 
+        if(command.getType() == CommandType.USE_FREE_PASS){
+            handleUseFreePass(state, command);
+            return;
+        }
+
         throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type for turn flow");
     }
 
@@ -245,31 +250,6 @@ public class GameCommandService {
 
         if(isCurrentCityOpenTarget(player)) {
             state.setValidMoveIds(new ArrayList<>());
-
-            if(player.isHasVoucher()) {
-                player.getVisitedCities().add(player.getCurrentCity());
-                player.setHasVoucher(false);
-                broadcastGoalReached(player, player.getCurrentCity());
-
-                if (!state.isGameOver() && gameSessionService.isVictory(player)) {
-                    state.setGameOver(true);
-                    broadcastGameOver(state);
-                }
-
-                if(newRemainingSteps <= 0) {
-                    player.setRemainingSteps(0);
-                    player.setPreviousCityId(null);
-                    String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
-                    state.setCurrentPlayerId(nextPlayerId);
-                    state.setLastDiceValue(null);
-                    state.setValidMoveIds(new ArrayList<>());
-                } else {
-                    recomputeValidMoveIds(state);
-                }
-
-                state.setVersion(state.getVersion() + 1);
-                return;
-            }
 
             state.setPhase(GamePhase.MINIGAME);
             state.setVersion(state.getVersion() + 1);
@@ -393,7 +373,7 @@ public class GameCommandService {
                 broadcastGameOver(state);
             }
         } else {
-            winner.setHasVoucher(true);
+            winner.setFreePassCount(winner.getFreePassCount() + 1);
             replaceCurrentTargetCity(state, targetPlayer);
         }
 
@@ -424,6 +404,46 @@ public class GameCommandService {
                 .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
 
         return isTargetCity && !alreadyCompleted;
+    }
+
+    private void handleUseFreePass(GameRoomState state, ClientCommand command) {
+        validateTurnContext(state, command);
+
+        PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(player.getFreePassCount() <= 0) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Player has no free pass available");
+        }
+
+        if(player.getCurrentCity() == null){
+            throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
+        }
+
+        if(!isCurrentCityOpenTarget(player)) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Free pass can only be used on an open target city");
+        }
+
+        player.setFreePassCount(player.getFreePassCount() - 1);
+        player.getVisitedCities().add(player.getCurrentCity());
+        broadcastGoalReached(player, player.getCurrentCity());
+
+        if(!state.isGameOver() && gameSessionService.isVictory(player)) {
+            state.setGameOver(true);
+            broadcastGameOver(state);
+        }
+
+        if(player.getRemainingSteps() <= 0){
+            player.setRemainingSteps(0);
+            player.setPreviousCityId(null);
+            String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+            state.setCurrentPlayerId(nextPlayerId);
+            state.setLastDiceValue(null);
+            state.setValidMoveIds(new ArrayList<>());
+        } else {
+            recomputeValidMoveIds(state);
+        }
+
+        state.setVersion(state.getVersion() + 1);
     }
 
     private void broadcastGoalReached(PlayerState player, City city) {

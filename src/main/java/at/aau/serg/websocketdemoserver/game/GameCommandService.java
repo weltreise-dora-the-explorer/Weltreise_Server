@@ -4,19 +4,19 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameMode;
-import at.aau.serg.websocketdemoserver.messaging.dtos.GameOverMessage;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
-import at.aau.serg.websocketdemoserver.messaging.dtos.GoalReachedMessage;
-import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerScore;
 import at.aau.serg.websocketdemoserver.game.models.City;
 import at.aau.serg.websocketdemoserver.game.models.CityNode;
 import at.aau.serg.websocketdemoserver.game.models.Connection;
 import at.aau.serg.websocketdemoserver.game.models.PlayerState;
-import at.aau.serg.websocketdemoserver.websocket.broker.WebSocketTopics;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import at.aau.serg.websocketdemoserver.messaging.dtos.GameOverMessage;
+import at.aau.serg.websocketdemoserver.messaging.dtos.GoalReachedMessage;
+import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerScore;
+import at.aau.serg.websocketdemoserver.websocket.broker.WebSocketTopics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,28 +34,53 @@ public class GameCommandService {
     private final MovementEngine movementEngine;
     private final GameSessionService gameSessionService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final CityDistributor cityDistributor;
 
     public GameCommandService() {
-        this(new Random(), loadWorldGraphSafe(), new MovementEngine(), new GameSessionService(), null);
+        this(new Random(), loadWorldGraphSafe(), new MovementEngine(), new GameSessionService(), null, createLoadedCityDistributor());
     }
 
     public GameCommandService(Random random) {
-        this(random, loadWorldGraphSafe(), new MovementEngine(), new GameSessionService(), null);
+        this(random, loadWorldGraphSafe(), new MovementEngine(), new GameSessionService(), null, createLoadedCityDistributor());
     }
 
     @Autowired
-    public GameCommandService(WorldGraph worldGraph, MovementEngine movementEngine,
-                               GameSessionService gameSessionService, SimpMessagingTemplate messagingTemplate) {
-        this(new Random(), worldGraph, movementEngine, gameSessionService, messagingTemplate);
+    public GameCommandService(WorldGraph worldGraph, MovementEngine movementEngine, GameSessionService gameSessionService,
+                              SimpMessagingTemplate messagingTemplate,
+                              CityDistributor cityDistributor) {
+        this(new Random(), worldGraph, movementEngine, gameSessionService, messagingTemplate, cityDistributor);
     }
 
-    GameCommandService(Random random, WorldGraph worldGraph, MovementEngine movementEngine,
-                       GameSessionService gameSessionService, SimpMessagingTemplate messagingTemplate) {
+    GameCommandService(Random random, WorldGraph worldGraph, MovementEngine movementEngine) {
+        this(random, worldGraph, movementEngine, new GameSessionService(), null, createLoadedCityDistributor());
+    }
+
+    GameCommandService(Random random,
+                       WorldGraph worldGraph,
+                       MovementEngine movementEngine,
+                       GameSessionService gameSessionService,
+                       SimpMessagingTemplate messagingTemplate) {
+        this(random, worldGraph, movementEngine, gameSessionService, messagingTemplate, createLoadedCityDistributor());
+    }
+
+    GameCommandService(Random random,
+                       GameSessionService gameSessionService,
+                       SimpMessagingTemplate messagingTemplate) {
+        this(random, loadWorldGraphSafe(), new MovementEngine(), gameSessionService, messagingTemplate, createLoadedCityDistributor());
+    }
+
+    GameCommandService(Random random,
+                       WorldGraph worldGraph,
+                       MovementEngine movementEngine,
+                       GameSessionService gameSessionService,
+                       SimpMessagingTemplate messagingTemplate,
+                       CityDistributor cityDistributor) {
         this.random = Objects.requireNonNull(random, "random must not be null");
         this.worldGraph = Objects.requireNonNull(worldGraph, "worldGraph must not be null");
         this.movementEngine = Objects.requireNonNull(movementEngine, "movementEngine must not be null");
         this.gameSessionService = Objects.requireNonNull(gameSessionService, "gameSessionService must not be null");
         this.messagingTemplate = messagingTemplate;
+        this.cityDistributor = Objects.requireNonNull(cityDistributor, "cityDistributor must not be null");
     }
 
     private static WorldGraph loadWorldGraphSafe() {
@@ -66,10 +91,16 @@ public class GameCommandService {
         }
     }
 
+    private static CityDistributor createLoadedCityDistributor() {
+        CityDistributor distributor = new CityDistributor();
+        distributor.loadCitiesFromJson();
+        return distributor;
+    }
+
     public void processCommand(GameRoomState state, ClientCommand command) {
         validateBase(state, command);
 
-        if (command.getType() == CommandType.UPDATE_GAME_MODE) {
+        if(command.getType() == CommandType.UPDATE_GAME_MODE){
             handleUpdateGameMode(state, command);
             return;
         }
@@ -94,21 +125,36 @@ public class GameCommandService {
             return;
         }
 
+        if(command.getType() == CommandType.START_MINIGAME){
+            handleStartMinigame(state, command);
+            return;
+        }
+
+        if(command.getType() == CommandType.FINISH_MINIGAME){
+            handleFinishMinigame(state, command);
+            return;
+        }
+
+        if(command.getType() == CommandType.USE_FREE_PASS){
+            handleUseFreePass(state, command);
+            return;
+        }
+
         throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type for turn flow");
     }
 
     private void handleUpdateGameMode(GameRoomState state, ClientCommand command) {
-        if (state.getPhase() != GamePhase.LOBBY) {
+        if(state.getPhase() != GamePhase.LOBBY) {
             throw new GameException(ErrorCode.INVALID_PHASE, "Gamemode can only be changed in lobby phase");
         }
 
-        if (state.getHostId() == null || !state.getHostId().equals(command.getPlayerId())) {
+        if(state.getHostId() == null || !state.getHostId().equals(command.getPlayerId())){
             throw new GameException(ErrorCode.INVALID_COMMAND, "Only the host can change the game mode");
         }
 
         GameMode selectedGameMode = command.getGameMode();
 
-        if (selectedGameMode == null) {
+        if(selectedGameMode == null){
             throw new GameException(ErrorCode.INVALID_COMMAND, "Game mode is required");
         }
 
@@ -200,12 +246,19 @@ public class GameCommandService {
 
         CityNode targetNode = chosenConnection.getDestination();
         City targetCity = new City(targetNode.getId(), targetNode.getName(), targetNode.getContinent(), targetNode.getColor());
+        player.setCurrentCity(targetCity);
 
-        int goalsBefore = player.getVisitedCities().size();
-        gameSessionService.visitCity(player, targetCity);
+        if(isCurrentCityOpenTarget(player)) {
+            state.setValidMoveIds(new ArrayList<>());
 
-        if (player.getVisitedCities().size() > goalsBefore) {
-            broadcastGoalReached(player, targetCity);
+            if(player.getFreePassCount() > 0){
+                state.setVersion(state.getVersion() + 1);
+                return;
+            }
+
+            state.setPhase(GamePhase.MINIGAME);
+            state.setVersion(state.getVersion() + 1);
+            return;
         }
 
         if (!state.isGameOver() && gameSessionService.isVictory(player)) {
@@ -248,22 +301,176 @@ public class GameCommandService {
         state.setVersion(state.getVersion() + 1);
     }
 
+    private void handleStartMinigame(GameRoomState state, ClientCommand command) {
+        validateTurnContext(state, command);
+
+        PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(player.getCurrentCity() == null) {
+            throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
+        }
+
+        boolean isTargetCity = player.getOwnedCities().stream()
+                .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+
+        if(!isTargetCity) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Minigame can only be started on a target city");
+        }
+
+        boolean alreadyCompleted = player.getVisitedCities().stream()
+                .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+
+        if(alreadyCompleted) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Target city is already completed");
+        }
+
+        state.setPhase(GamePhase.MINIGAME);
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleFinishMinigame(GameRoomState state, ClientCommand command) {
+        if(state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Minigame can only be finished during minigame phase");
+        }
+
+        if(state.getCurrentPlayerId() == null) {
+            throw new GameException(ErrorCode.CURRENT_PLAYER_NOT_SET, "Current player is not set");
+        }
+
+        if(!state.getCurrentPlayerId().equals(command.getPlayerId())) {
+            throw new GameException(ErrorCode.NOT_YOUR_TURN, "Only the current target player can finish the minigame prototype");
+        }
+
+        PlayerState targetPlayer = findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(targetPlayer.getCurrentCity() == null) {
+            throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
+        }
+
+        boolean isTargetCity = targetPlayer.getOwnedCities().stream()
+                .anyMatch(city -> city.getId().equals(targetPlayer.getCurrentCity().getId()));
+
+        if(!isTargetCity) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Current city is not a target city");
+        }
+
+        boolean alreadyCompleted = targetPlayer.getVisitedCities().stream()
+                .anyMatch(city -> city.getId().equals(targetPlayer.getCurrentCity().getId()));
+
+        if(alreadyCompleted) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Target city is already completed");
+        }
+
+        String winnerPlayerId = command.getWinnerPlayerId();
+
+        if(winnerPlayerId == null) {
+            winnerPlayerId = command.getPlayerId();
+        }
+
+        PlayerState winner = findPlayerState(state.getPlayers(), winnerPlayerId);
+
+        if(winner.getPlayerId().equals(targetPlayer.getPlayerId())) {
+            targetPlayer.getVisitedCities().add(targetPlayer.getCurrentCity());
+            broadcastGoalReached(targetPlayer, targetPlayer.getCurrentCity());
+
+            if (!state.isGameOver() && gameSessionService.isVictory(targetPlayer)) {
+                state.setGameOver(true);
+                broadcastGameOver(state);
+            }
+        } else {
+            replaceCurrentTargetCity(state, targetPlayer);
+            winner.setFreePassCount(winner.getFreePassCount() + 1);
+        }
+
+        if(targetPlayer.getRemainingSteps() <= 0) {
+            targetPlayer.setRemainingSteps(0);
+            targetPlayer.setPreviousCityId(null);
+            String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+            state.setCurrentPlayerId(nextPlayerId);
+            state.setLastDiceValue(null);
+            state.setValidMoveIds(new ArrayList<>());
+        } else {
+            recomputeValidMoveIds(state);
+        }
+
+        state.setPhase(GamePhase.IN_TURN);
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private boolean isCurrentCityOpenTarget(PlayerState player) {
+        if(player.getCurrentCity() == null) {
+            return false;
+        }
+
+        boolean isTargetCity = player.getOwnedCities().stream()
+                .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+
+        boolean alreadyCompleted = player.getVisitedCities().stream()
+                .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+
+        return isTargetCity && !alreadyCompleted;
+    }
+
+    private void handleUseFreePass(GameRoomState state, ClientCommand command) {
+        validateTurnContext(state, command);
+
+        PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(player.getFreePassCount() <= 0) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Player has no free pass available");
+        }
+
+        if(player.getCurrentCity() == null){
+            throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
+        }
+
+        if(!isCurrentCityOpenTarget(player)) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Free pass can only be used on an open target city");
+        }
+
+        player.setFreePassCount(player.getFreePassCount() - 1);
+        player.getVisitedCities().add(player.getCurrentCity());
+        broadcastGoalReached(player, player.getCurrentCity());
+
+        if(!state.isGameOver() && gameSessionService.isVictory(player)) {
+            state.setGameOver(true);
+            broadcastGameOver(state);
+        }
+
+        if(player.getRemainingSteps() <= 0){
+            player.setRemainingSteps(0);
+            player.setPreviousCityId(null);
+            String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+            state.setCurrentPlayerId(nextPlayerId);
+            state.setLastDiceValue(null);
+            state.setValidMoveIds(new ArrayList<>());
+        } else {
+            recomputeValidMoveIds(state);
+        }
+
+        state.setVersion(state.getVersion() + 1);
+    }
+
     private void broadcastGoalReached(PlayerState player, City city) {
         if (messagingTemplate == null) return;
+
         GoalReachedMessage message = new GoalReachedMessage(
                 player.getPlayerId(),
                 city.getName(),
                 player.getVisitedCities().size(),
                 player.getOwnedCities().size()
         );
+
         messagingTemplate.convertAndSend(WebSocketTopics.GOAL_REACHED, message);
     }
 
     private void broadcastGameOver(GameRoomState state) {
         if (messagingTemplate == null) return;
+
         List<PlayerScore> scores = state.getPlayers().stream()
-                .map(p -> new PlayerScore(p.getPlayerId(), calculateScore(p)))
+                .map(player -> new PlayerScore(player.getPlayerId(), calculateScore(player)))
                 .collect(Collectors.toList());
+
         messagingTemplate.convertAndSend(WebSocketTopics.GAME_OVER, new GameOverMessage(scores));
     }
 
@@ -271,6 +478,37 @@ public class GameCommandService {
         int reached = player.getVisitedCities().size();
         int remaining = player.getOwnedCities().size() - reached;
         return reached - remaining;
+    }
+
+    private City replaceCurrentTargetCity(GameRoomState state, PlayerState targetPlayer) {
+        City lostCity = targetPlayer.getCurrentCity();
+
+        if(lostCity == null) {
+            throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
+        }
+
+        targetPlayer.getOwnedCities().removeIf(city -> city.getId().equals(lostCity.getId()));
+
+        City replacementCity = cityDistributor.getAllCities().stream()
+                .filter(city -> !city.getId().equals(lostCity.getId()))
+                .filter(city -> !containsCityById(targetPlayer.getOwnedCities(), city.getId()))
+                .filter(city -> !containsCityById(targetPlayer.getVisitedCities(), city.getId()))
+                .filter(city -> !isCityAssignedToAnyPlayer(state.getPlayers(), city.getId()))
+                .findFirst()
+                .orElseThrow(() -> new GameException(ErrorCode.INVALID_COMMAND, "No replacement city available"));
+
+        targetPlayer.getOwnedCities().add(replacementCity);
+
+        return replacementCity;
+    }
+
+    private boolean containsCityById(List<City> cities, String cityId) {
+        return cities.stream().anyMatch(city -> city.getId().equals(cityId));
+    }
+
+    private boolean isCityAssignedToAnyPlayer(List<PlayerState> players, String cityId) {
+        return players.stream()
+                .anyMatch(player -> containsCityById(player.getOwnedCities(), cityId));
     }
 
     private void recomputeValidMoveIds(GameRoomState state) {
@@ -333,6 +571,7 @@ public class GameCommandService {
         if (state.isGameOver()) {
             throw new GameException(ErrorCode.GAME_OVER, "Das Spiel ist bereits beendet");
         }
+
         if (state.getPhase() != GamePhase.IN_TURN) {
             throw new GameException(ErrorCode.INVALID_PHASE, "Command not allowed in current phase");
         }

@@ -199,6 +199,209 @@ class GameCommandServiceUnitTest {
         assertThat(state.getVersion()).isEqualTo(0L);
     }
 
+    @Test
+    void startMinigameSetsPhaseToMinigameAndIncrementsVersion() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.getOwnedCities().add(player.getCurrentCity());
+
+        GameRoomState state = inTurnState(players);
+
+        service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getPhase()).isEqualTo(GamePhase.MINIGAME);
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void startMinigameRejectsWhenCurrentCityIsNotTargetCity() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("target city");
+    }
+
+    @Test
+    void startMinigameRejectsAlreadyCompletedTargetCity() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.getOwnedCities().add(player.getCurrentCity());
+        player.getVisitedCities().add(player.getCurrentCity());
+
+        GameRoomState state = inTurnState(players);
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("already completed");
+    }
+
+    @Test
+    void finishMinigameAddsCurrentTargetCityToVisitedCitiesAndReturnsToTurn() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState targetPlayer = players.getFirst();
+        targetPlayer.getOwnedCities().add(targetPlayer.getCurrentCity());
+
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+
+        ClientCommand command = new ClientCommand(
+                CommandType.FINISH_MINIGAME,
+                "lobby-1",
+                "player-1",
+                null,
+                null
+        );
+        command.setWinnerPlayerId("player-1");
+
+        service.processCommand(state, command);
+
+        assertThat(targetPlayer.getVisitedCities()).containsExactly(targetPlayer.getCurrentCity());
+        assertThat(targetPlayer.getFreePassCount()).isZero();
+        assertThat(state.getPhase()).isEqualTo(GamePhase.IN_TURN);
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void finishMinigameGivesVoucherToOtherWinner() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+
+        PlayerState targetPlayer = players.getFirst();
+        PlayerState winner = players.get(1);
+
+        City lostCity = targetPlayer.getCurrentCity();
+        targetPlayer.getOwnedCities().add(lostCity);
+
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+
+        ClientCommand command = new ClientCommand(
+                CommandType.FINISH_MINIGAME,
+                "lobby-1",
+                "player-1",
+                null,
+                null
+        );
+        command.setWinnerPlayerId("player-2");
+
+        service.processCommand(state, command);
+
+        assertThat(targetPlayer.getVisitedCities()).isEmpty();
+        assertThat(winner.getFreePassCount()).isEqualTo(1);
+
+        assertThat(targetPlayer.getOwnedCities()).hasSize(1);
+        assertThat(targetPlayer.getOwnedCities())
+                .noneMatch(city -> city.getId().equals(lostCity.getId()));
+
+        assertThat(state.getPhase()).isEqualTo(GamePhase.IN_TURN);
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void finishMinigameKeepsCurrentPlayerWhenStepsRemain() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+
+        PlayerState targetPlayer = players.getFirst();
+        targetPlayer.getOwnedCities().add(targetPlayer.getCurrentCity());
+        targetPlayer.setRemainingSteps(2);
+
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+        state.setCurrentPlayerId("player-1");
+        state.setLastDiceValue(4);
+
+        ClientCommand command = new ClientCommand(
+                CommandType.FINISH_MINIGAME,
+                "lobby-1",
+                "player-1",
+                null,
+                null
+        );
+        command.setWinnerPlayerId("player-1");
+
+        service.processCommand(state, command);
+
+        assertThat(targetPlayer.getVisitedCities()).containsExactly(targetPlayer.getCurrentCity());
+        assertThat(targetPlayer.getRemainingSteps()).isEqualTo(2);
+        assertThat(state.getCurrentPlayerId()).isEqualTo("player-1");
+        assertThat(state.getLastDiceValue()).isEqualTo(4);
+        assertThat(state.getPhase()).isEqualTo(GamePhase.IN_TURN);
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void finishMinigameMovesToNextPlayerWhenNoStepsRemain() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+
+        PlayerState targetPlayer = players.getFirst();
+        targetPlayer.getOwnedCities().add(targetPlayer.getCurrentCity());
+        targetPlayer.setRemainingSteps(0);
+
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+        state.setCurrentPlayerId("player-1");
+        state.setLastDiceValue(4);
+
+        ClientCommand command = new ClientCommand(
+                CommandType.FINISH_MINIGAME,
+                "lobby-1",
+                "player-1",
+                null,
+                null
+        );
+        command.setWinnerPlayerId("player-1");
+
+        service.processCommand(state, command);
+
+        assertThat(targetPlayer.getVisitedCities()).containsExactly(targetPlayer.getCurrentCity());
+        assertThat(targetPlayer.getRemainingSteps()).isEqualTo(0);
+        assertThat(state.getCurrentPlayerId()).isEqualTo("player-2");
+        assertThat(state.getLastDiceValue()).isNull();
+        assertThat(state.getValidMoveIds()).isEmpty();
+        assertThat(state.getPhase()).isEqualTo(GamePhase.IN_TURN);
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void finishMinigameRejectsWhenNotInMinigamePhase() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.FINISH_MINIGAME, "lobby-1", "player-1", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("during minigame phase");
+    }
+
+    @Test
+    void finishMinigameRejectsNonCurrentPlayer() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.getOwnedCities().add(player.getCurrentCity());
+
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.FINISH_MINIGAME, "lobby-1", "player-2", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("current target player");
+    }
+
 
     @Test
     void previousCityIdClearedAfterAutoTurnSwitch_allowsReturnInNextTurn() {
@@ -215,7 +418,7 @@ class GameCommandServiceUnitTest {
 
         // Turn 1: roll 1, move novosibirsk → omsk (cost=1, steps hit 0 → auto-switch)
         service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
-        ClientCommand moveCmd = new ClientCommand(CommandType.MOVE_TO_CITY, "lobby-1", "player-1", null, null, "omsk", null);
+        ClientCommand moveCmd = new ClientCommand(CommandType.MOVE_TO_CITY, "lobby-1", "player-1", null, null, "omsk", null, null, null);
         service.processCommand(state, moveCmd);
 
         // Auto-switch returns to player-1 (only player). previousCityId must be null now.

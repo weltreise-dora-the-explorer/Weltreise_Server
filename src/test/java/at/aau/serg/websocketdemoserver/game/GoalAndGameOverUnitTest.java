@@ -82,17 +82,12 @@ class GoalAndGameOverUnitTest {
 
         service.processCommand(state, moveToCityCommand("paris"));
 
-        assertThat(player.getVisitedCities()).extracting(City::getId).containsExactly("paris");
+        assertThat(player.getCurrentCity().getId()).isEqualTo("paris");
+        assertThat(player.getVisitedCities()).isEmpty();
+        assertThat(state.getPhase()).isEqualTo(GamePhase.MINIGAME);
 
-        ArgumentCaptor<GoalReachedMessage> captor = ArgumentCaptor.forClass(GoalReachedMessage.class);
-        verify(messagingTemplate).convertAndSend(
-                eq("/topic/goal-reached"), captor.capture());
-
-        GoalReachedMessage msg = captor.getValue();
-        assertThat(msg.getPlayerName()).isEqualTo(PLAYER_ID);
-        assertThat(msg.getCityName()).isEqualTo("Paris");
-        assertThat(msg.getReached()).isEqualTo(1);
-        assertThat(msg.getTotal()).isEqualTo(1);
+        verify(messagingTemplate, never()).convertAndSend(
+                eq("/topic/goal-reached"), any(GoalReachedMessage.class));
     }
 
     @Test
@@ -174,6 +169,22 @@ class GoalAndGameOverUnitTest {
 
         service.processCommand(state, moveToCityCommand("vienna"));
 
+        assertThat(state.getPhase()).isEqualTo(GamePhase.MINIGAME);
+        assertThat(state.isGameOver()).isFalse();
+        assertThat(player.getVisitedCities()).isEmpty();
+
+        ClientCommand finishCommand = new ClientCommand(
+                CommandType.FINISH_MINIGAME,
+                LOBBY_ID,
+                PLAYER_ID,
+                null,
+                null
+        );
+        finishCommand.setWinnerPlayerId(PLAYER_ID);
+
+        service.processCommand(state, finishCommand);
+
+        assertThat(player.getVisitedCities()).extracting(City::getId).containsExactly("vienna");
         assertThat(state.isGameOver()).isTrue();
 
         ArgumentCaptor<GameOverMessage> captor = ArgumentCaptor.forClass(GameOverMessage.class);
@@ -320,7 +331,7 @@ class GoalAndGameOverUnitTest {
     }
 
     private ClientCommand moveToCityCommand(String targetCityId) {
-        return new ClientCommand(CommandType.MOVE_TO_CITY, LOBBY_ID, PLAYER_ID, null, null, targetCityId, null);
+        return new ClientCommand(CommandType.MOVE_TO_CITY, LOBBY_ID, PLAYER_ID, null, null, targetCityId, null, null, null);
     }
 
     private GameRoomState inTurnState(List<PlayerState> players) {

@@ -251,7 +251,10 @@ public class GameCommandService {
         if(isCurrentCityOpenTarget(player)) {
             state.setValidMoveIds(new ArrayList<>());
 
-            state.setPhase(GamePhase.MINIGAME);
+            if (player.getFreePassCount() <= 0) {
+                state.setPhase(GamePhase.MINIGAME);
+            }
+
             state.setVersion(state.getVersion() + 1);
             return;
         }

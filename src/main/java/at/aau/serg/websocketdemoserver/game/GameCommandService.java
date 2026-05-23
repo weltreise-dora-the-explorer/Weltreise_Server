@@ -251,11 +251,6 @@ public class GameCommandService {
         if(isCurrentCityOpenTarget(player)) {
             state.setValidMoveIds(new ArrayList<>());
 
-            if(player.getFreePassCount() > 0){
-                state.setVersion(state.getVersion() + 1);
-                return;
-            }
-
             state.setPhase(GamePhase.MINIGAME);
             state.setVersion(state.getVersion() + 1);
             return;
@@ -263,7 +258,7 @@ public class GameCommandService {
 
         if (!state.isGameOver() && gameSessionService.isVictory(player)) {
             state.setGameOver(true);
-            broadcastGameOver(state);
+            broadcastGameOver(state, player.getPlayerId());
         }
 
         if (newRemainingSteps <= 0) {
@@ -375,11 +370,11 @@ public class GameCommandService {
 
             if (!state.isGameOver() && gameSessionService.isVictory(targetPlayer)) {
                 state.setGameOver(true);
-                broadcastGameOver(state);
+                broadcastGameOver(state, targetPlayer.getPlayerId());
             }
         } else {
-            replaceCurrentTargetCity(state, targetPlayer);
             winner.setFreePassCount(winner.getFreePassCount() + 1);
+            replaceCurrentTargetCity(state, targetPlayer);
         }
 
         if(targetPlayer.getRemainingSteps() <= 0) {
@@ -434,7 +429,7 @@ public class GameCommandService {
 
         if(!state.isGameOver() && gameSessionService.isVictory(player)) {
             state.setGameOver(true);
-            broadcastGameOver(state);
+            broadcastGameOver(state, player.getPlayerId());
         }
 
         if(player.getRemainingSteps() <= 0){
@@ -464,23 +459,21 @@ public class GameCommandService {
         messagingTemplate.convertAndSend(WebSocketTopics.GOAL_REACHED, message);
     }
 
-    private void broadcastGameOver(GameRoomState state) {
+    private void broadcastGameOver(GameRoomState state, String winnerId) {
         if (messagingTemplate == null) return;
 
         List<PlayerScore> scores = state.getPlayers().stream()
                 .map(player -> new PlayerScore(player.getPlayerId(), calculateScore(player)))
                 .collect(Collectors.toList());
 
-        messagingTemplate.convertAndSend(WebSocketTopics.GAME_OVER, new GameOverMessage(scores));
+        messagingTemplate.convertAndSend(WebSocketTopics.GAME_OVER, new GameOverMessage(winnerId, scores));
     }
 
     int calculateScore(PlayerState player) {
-        int reached = player.getVisitedCities().size();
-        int remaining = player.getOwnedCities().size() - reached;
-        return reached - remaining;
+        return player.getVisitedCities().size();
     }
 
-    private City replaceCurrentTargetCity(GameRoomState state, PlayerState targetPlayer) {
+    private void replaceCurrentTargetCity(GameRoomState state, PlayerState targetPlayer) {
         City lostCity = targetPlayer.getCurrentCity();
 
         if(lostCity == null) {
@@ -498,8 +491,6 @@ public class GameCommandService {
                 .orElseThrow(() -> new GameException(ErrorCode.INVALID_COMMAND, "No replacement city available"));
 
         targetPlayer.getOwnedCities().add(replacementCity);
-
-        return replacementCity;
     }
 
     private boolean containsCityById(List<City> cities, String cityId) {

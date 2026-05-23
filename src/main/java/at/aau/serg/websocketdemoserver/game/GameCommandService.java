@@ -210,7 +210,7 @@ public class GameCommandService {
 
         if (!state.isGameOver() && gameSessionService.isVictory(player)) {
             state.setGameOver(true);
-            broadcastGameOver(state);
+            broadcastGameOver(state, player.getPlayerId());
         }
 
         if (newRemainingSteps <= 0) {
@@ -259,18 +259,16 @@ public class GameCommandService {
         messagingTemplate.convertAndSend(WebSocketTopics.GOAL_REACHED, message);
     }
 
-    private void broadcastGameOver(GameRoomState state) {
+    private void broadcastGameOver(GameRoomState state, String winnerId) {
         if (messagingTemplate == null) return;
         List<PlayerScore> scores = state.getPlayers().stream()
                 .map(p -> new PlayerScore(p.getPlayerId(), calculateScore(p)))
                 .collect(Collectors.toList());
-        messagingTemplate.convertAndSend(WebSocketTopics.GAME_OVER, new GameOverMessage(scores));
+        messagingTemplate.convertAndSend(WebSocketTopics.GAME_OVER, new GameOverMessage(winnerId, scores));
     }
 
     int calculateScore(PlayerState player) {
-        int reached = player.getVisitedCities().size();
-        int remaining = player.getOwnedCities().size() - reached;
-        return reached - remaining;
+        return player.getVisitedCities().size();
     }
 
     private void recomputeValidMoveIds(GameRoomState state) {

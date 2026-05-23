@@ -10,5 +10,6 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class GameOverMessage {
+    private String winnerId;
     private List<PlayerScore> scores;
 }

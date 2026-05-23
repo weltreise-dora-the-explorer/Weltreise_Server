@@ -1026,7 +1026,8 @@
     "color": "GREEN",
     "trainConnections": [
       "dublin",
-      "edinburgh"
+      "edinburgh",
+      "paris"
 
     ],
     "flightConnections": [
@@ -1289,7 +1290,8 @@
 
       "frankurt",
       "bern",
-      "frankfurt"
+      "paris"
+
     ],
     "flightConnections": [
       "nairobi",

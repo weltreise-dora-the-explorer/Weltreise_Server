@@ -13,6 +13,7 @@ public enum CommandType {
     MOVE_TO_CITY,
     END_TURN,
     START_MINIGAME,
+    ANNOUNCE_MINIGAME_RESULT,
     FINISH_MINIGAME,
     USE_FREE_PASS,
     LEAVE_LOBBY,

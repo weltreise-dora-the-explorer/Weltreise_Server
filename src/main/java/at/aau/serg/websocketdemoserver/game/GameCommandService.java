@@ -130,6 +130,11 @@ public class GameCommandService {
             return;
         }
 
+        if(command.getType() == CommandType.ANNOUNCE_MINIGAME_RESULT) {
+            handleAnnounceMinigameResult(state, command);
+            return;
+        }
+
         if(command.getType() == CommandType.FINISH_MINIGAME){
             handleFinishMinigame(state, command);
             return;
@@ -362,6 +367,10 @@ public class GameCommandService {
         String winnerPlayerId = command.getWinnerPlayerId();
 
         if(winnerPlayerId == null) {
+            winnerPlayerId = state.getMinigameWinnerPlayerId();
+        }
+
+        if(winnerPlayerId == null) {
             winnerPlayerId = command.getPlayerId();
         }
 
@@ -391,7 +400,33 @@ public class GameCommandService {
             recomputeValidMoveIds(state);
         }
 
+        state.setMinigameWinnerPlayerId(null);
         state.setPhase(GamePhase.IN_TURN);
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleAnnounceMinigameResult(GameRoomState state, ClientCommand command) {
+        if(state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Minigame result can only be announced during minigame phase");
+        }
+
+        if(state.getCurrentPlayerId() == null) {
+            throw new GameException(ErrorCode.CURRENT_PLAYER_NOT_SET, "Current player is not set");
+        }
+
+        if(!state.getCurrentPlayerId().equals(command.getPlayerId())) {
+            throw new GameException(ErrorCode.NOT_YOUR_TURN, "Only the current target player can announce the minigame result");
+        }
+
+        String winnerPlayerId = command.getWinnerPlayerId();
+
+        if(winnerPlayerId == null) {
+            winnerPlayerId = command.getPlayerId();
+        }
+
+        findPlayerState(state.getPlayers(), winnerPlayerId);
+
+        state.setMinigameWinnerPlayerId(winnerPlayerId);
         state.setVersion(state.getVersion() + 1);
     }
 
@@ -483,6 +518,8 @@ public class GameCommandService {
             throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
         }
 
+        state.setMinigameLostCityName(lostCity.getName());
+
         targetPlayer.getOwnedCities().removeIf(city -> city.getId().equals(lostCity.getId()));
 
         City replacementCity = cityDistributor.getAllCities().stream()
@@ -494,6 +531,7 @@ public class GameCommandService {
                 .orElseThrow(() -> new GameException(ErrorCode.INVALID_COMMAND, "No replacement city available"));
 
         targetPlayer.getOwnedCities().add(replacementCity);
+        state.setMinigameNewCityName(replacementCity.getName());
     }
 
     private boolean containsCityById(List<City> cities, String cityId) {

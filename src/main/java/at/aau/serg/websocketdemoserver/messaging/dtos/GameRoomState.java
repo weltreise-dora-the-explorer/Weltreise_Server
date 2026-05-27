@@ -28,9 +28,12 @@ public class GameRoomState {
 
     private GameMode gameMode = GameMode.CITY_HOPPER;
     private boolean gameOver = false;
+    private String minigameWinnerPlayerId;
+    private String minigameLostCityName;
+    private String minigameNewCityName;
 
     public GameRoomState(String lobbyId, String hostId, List<PlayerState> players,
                          GamePhase phase, String currentPlayerId, Integer lastDiceValue, long version) {
-        this(lobbyId, hostId, players, phase, currentPlayerId, lastDiceValue, version, new ArrayList<>(), GameMode.CITY_HOPPER, false);
+        this(lobbyId, hostId, players, phase, currentPlayerId, lastDiceValue, version, new ArrayList<>(), GameMode.CITY_HOPPER, false, null, null, null);
     }
 }

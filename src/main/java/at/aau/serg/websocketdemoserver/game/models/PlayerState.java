@@ -26,6 +26,7 @@ public class PlayerState {
     private List<City> ownedCities = new ArrayList<>();
     private List<City> visitedCities = new ArrayList<>();
     private int freePassCount;
+    private boolean shakeCheatUsedThisRoll = false;
 
     /**
      * Konstruktor nur mit playerId (für Lobby-Join).

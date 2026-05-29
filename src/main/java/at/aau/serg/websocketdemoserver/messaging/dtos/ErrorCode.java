@@ -22,5 +22,6 @@ public enum ErrorCode {
     LOBBY_FULL,
     CITY_NOT_FOUND,
     INVALID_MOVE_TARGET,
-    GAME_OVER
+    GAME_OVER,
+    SHAKE_CHEAT_NOT_ALLOWED
 }

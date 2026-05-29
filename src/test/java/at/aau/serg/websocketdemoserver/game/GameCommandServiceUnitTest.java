@@ -430,6 +430,142 @@ class GameCommandServiceUnitTest {
     }
 
     @Test
+    void shakeCheatSetsRemainingStepsToTwoAndMarksFlag() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.setRemainingSteps(1);
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(1);
+
+        service.processCommand(state, new ClientCommand(CommandType.USE_SHAKE_CHEAT, "lobby-1", "player-1", null, null));
+
+        assertThat(player.getRemainingSteps()).isEqualTo(2);
+        assertThat(player.isShakeCheatUsedThisRoll()).isTrue();
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void shakeCheatRejectsWhenRemainingStepsNotOne() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(3);
+
+        for (int steps : new int[] { 0, 2, 3, 6 }) {
+            player.setRemainingSteps(steps);
+            player.setShakeCheatUsedThisRoll(false);
+
+            assertThatThrownBy(() -> service.processCommand(
+                    state,
+                    new ClientCommand(CommandType.USE_SHAKE_CHEAT, "lobby-1", "player-1", null, null)))
+                    .isInstanceOf(GameException.class)
+                    .hasMessageContaining("1 remaining step");
+        }
+    }
+
+    @Test
+    void shakeCheatRejectsNonActivePlayer() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        players.get(1).setRemainingSteps(1);
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(1);
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.USE_SHAKE_CHEAT, "lobby-1", "player-2", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Not your turn");
+    }
+
+    @Test
+    void shakeCheatRejectsBeforeRoll() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.USE_SHAKE_CHEAT, "lobby-1", "player-1", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("1 remaining step");
+    }
+
+    @Test
+    void shakeCheatRejectsInLobbyPhase() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = new GameRoomState();
+        state.setPhase(GamePhase.LOBBY);
+        state.setPlayers(defaultPlayers());
+        state.setCurrentPlayerId("player-1");
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.USE_SHAKE_CHEAT, "lobby-1", "player-1", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("current phase");
+    }
+
+    @Test
+    void shakeCheatRejectsSecondUseInSameRoll() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.setRemainingSteps(1);
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(1);
+
+        service.processCommand(state, new ClientCommand(CommandType.USE_SHAKE_CHEAT, "lobby-1", "player-1", null, null));
+        player.setRemainingSteps(1);
+
+        assertThatThrownBy(() -> service.processCommand(
+                state,
+                new ClientCommand(CommandType.USE_SHAKE_CHEAT, "lobby-1", "player-1", null, null)))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("already used");
+    }
+
+    @Test
+    void shakeCheatAllowedAgainAfterNextRoll() {
+        GameCommandService service = new GameCommandService(new FixedRandom(0)); // dice = 1
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.setRemainingSteps(1);
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(1);
+
+        service.processCommand(state, new ClientCommand(CommandType.USE_SHAKE_CHEAT, "lobby-1", "player-1", null, null));
+        assertThat(player.isShakeCheatUsedThisRoll()).isTrue();
+
+        state.setLastDiceValue(null);
+        player.setRemainingSteps(0);
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
+
+        assertThat(player.isShakeCheatUsedThisRoll()).isFalse();
+        player.setRemainingSteps(1);
+
+        service.processCommand(state, new ClientCommand(CommandType.USE_SHAKE_CHEAT, "lobby-1", "player-1", null, null));
+        assertThat(player.getRemainingSteps()).isEqualTo(2);
+        assertThat(player.isShakeCheatUsedThisRoll()).isTrue();
+    }
+
+    @Test
+    void shakeCheatRecomputesValidMoveIds() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState player = players.getFirst();
+        player.setCurrentCity(new City("wien", "Wien", Continent.EUROPE_AFRICA, CityColor.RED));
+        player.setRemainingSteps(1);
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(1);
+
+        service.processCommand(state, new ClientCommand(CommandType.USE_SHAKE_CHEAT, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getValidMoveIds()).isNotEmpty();
+    }
+
+    @Test
     void endTurnClearsValidMoveIds() {
         GameCommandService service = new GameCommandService(new FixedRandom(2));
         GameRoomState state = inTurnState(defaultPlayers());

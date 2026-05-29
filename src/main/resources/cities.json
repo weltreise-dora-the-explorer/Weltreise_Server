@@ -1287,10 +1287,9 @@
       "marseille",
       "bordeaux",
       "brest",
-
-      "frankurt",
-      "bern",
-      "paris"
+      "london",
+      "frankfurt",
+      "bern"
 
     ],
     "flightConnections": [

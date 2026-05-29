@@ -145,6 +145,11 @@ public class GameCommandService {
             return;
         }
 
+        if(command.getType() == CommandType.USE_SHAKE_CHEAT){
+            handleShakeCheat(state, command);
+            return;
+        }
+
         throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type for turn flow");
     }
 
@@ -178,6 +183,7 @@ public class GameCommandService {
 
         PlayerState currentPlayer = findPlayerState(state.getPlayers(), command.getPlayerId());
         currentPlayer.setRemainingSteps(diceValue);
+        currentPlayer.setShakeCheatUsedThisRoll(false);
 
         recomputeValidMoveIds(state);
         state.setVersion(state.getVersion() + 1);
@@ -481,6 +487,28 @@ public class GameCommandService {
             recomputeValidMoveIds(state);
         }
 
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleShakeCheat(GameRoomState state, ClientCommand command) {
+        validateTurnContext(state, command);
+
+        PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if (player.getRemainingSteps() != 1) {
+            throw new GameException(ErrorCode.SHAKE_CHEAT_NOT_ALLOWED,
+                    "Shake cheat only allowed with exactly 1 remaining step");
+        }
+
+        if (player.isShakeCheatUsedThisRoll()) {
+            throw new GameException(ErrorCode.SHAKE_CHEAT_NOT_ALLOWED,
+                    "Shake cheat already used in this dice roll");
+        }
+
+        player.setShakeCheatUsedThisRoll(true);
+        player.setRemainingSteps(2);
+
+        recomputeValidMoveIds(state);
         state.setVersion(state.getVersion() + 1);
     }
 

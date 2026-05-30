@@ -183,7 +183,13 @@ public class GameCommandService {
 
         PlayerState currentPlayer = findPlayerState(state.getPlayers(), command.getPlayerId());
         currentPlayer.setRemainingSteps(diceValue);
-        currentPlayer.setShakeCheatUsedThisRoll(false);
+
+        // Report-Window schliesst sich bei jedem Wurf, egal welcher Spieler rollt:
+        // alle Cheat-Beweise auf null setzen.
+        for (PlayerState p : state.getPlayers()) {
+            p.setShakeCheatUsedThisRoll(false);
+            p.setShakeCheatReported(false);
+        }
 
         recomputeValidMoveIds(state);
         state.setVersion(state.getVersion() + 1);

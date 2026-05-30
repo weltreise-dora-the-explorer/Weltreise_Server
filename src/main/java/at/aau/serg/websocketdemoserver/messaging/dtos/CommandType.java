@@ -17,6 +17,7 @@ public enum CommandType {
     FINISH_MINIGAME,
     USE_FREE_PASS,
     USE_SHAKE_CHEAT,
+    REPORT_CHEAT,
     LEAVE_LOBBY,
     LOBBY_CLOSED,
     RESET_LOBBY,

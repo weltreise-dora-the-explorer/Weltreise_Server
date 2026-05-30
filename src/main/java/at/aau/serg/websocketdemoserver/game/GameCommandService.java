@@ -150,6 +150,11 @@ public class GameCommandService {
             return;
         }
 
+        if(command.getType() == CommandType.REPORT_CHEAT){
+            handleReportCheat(state, command);
+            return;
+        }
+
         throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type for turn flow");
     }
 
@@ -515,6 +520,36 @@ public class GameCommandService {
         player.setRemainingSteps(2);
 
         recomputeValidMoveIds(state);
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleReportCheat(GameRoomState state, ClientCommand command) {
+        if (state.isGameOver()) {
+            throw new GameException(ErrorCode.REPORT_NOT_ALLOWED, "Game already over");
+        }
+        if (state.getPhase() == GamePhase.LOBBY) {
+            throw new GameException(ErrorCode.REPORT_NOT_ALLOWED, "Reports only allowed during active game");
+        }
+
+        String reportedPlayerId = command.getReportedPlayerId();
+        if (reportedPlayerId == null || reportedPlayerId.isBlank()) {
+            throw new GameException(ErrorCode.REPORT_NOT_ALLOWED, "reportedPlayerId is required");
+        }
+        if (reportedPlayerId.equals(command.getPlayerId())) {
+            throw new GameException(ErrorCode.REPORT_NOT_ALLOWED, "Cannot report yourself");
+        }
+
+        PlayerState reporter = findPlayerState(state.getPlayers(), command.getPlayerId());
+        PlayerState reported = findPlayerState(state.getPlayers(), reportedPlayerId);
+
+        boolean hit = reported.isShakeCheatUsedThisRoll() && !reported.isShakeCheatReported();
+        if (hit) {
+            reported.setShakeCheatReported(true);
+            reported.setMustSkipNextTurn(true);
+        } else {
+            reporter.setMustSkipNextTurn(true);
+        }
+
         state.setVersion(state.getVersion() + 1);
     }
 

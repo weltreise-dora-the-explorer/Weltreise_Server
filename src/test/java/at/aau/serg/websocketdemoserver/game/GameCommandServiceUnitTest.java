@@ -565,6 +565,207 @@ class GameCommandServiceUnitTest {
         assertThat(state.getValidMoveIds()).isNotEmpty();
     }
 
+    // ========== REPORT_CHEAT TESTS ==========
+
+    @Test
+    void reportCheatHitMarksCheaterAndConsumesEvidenceFlag() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        PlayerState cheater = players.get(1);
+        cheater.setShakeCheatUsedThisRoll(true);
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(1);
+
+        ClientCommand cmd = new ClientCommand(CommandType.REPORT_CHEAT, "lobby-1", "player-1", null, null);
+        cmd.setReportedPlayerId("player-2");
+
+        service.processCommand(state, cmd);
+
+        assertThat(cheater.isMustSkipNextTurn()).isTrue();
+        assertThat(cheater.isShakeCheatReported()).isTrue();
+        assertThat(players.getFirst().isMustSkipNextTurn()).isFalse();
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void reportCheatMissPenalizesReporter() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        // player-2 did not cheat
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(1);
+
+        ClientCommand cmd = new ClientCommand(CommandType.REPORT_CHEAT, "lobby-1", "player-1", null, null);
+        cmd.setReportedPlayerId("player-2");
+
+        service.processCommand(state, cmd);
+
+        assertThat(players.getFirst().isMustSkipNextTurn()).isTrue();
+        assertThat(players.get(1).isMustSkipNextTurn()).isFalse();
+        assertThat(players.get(1).isShakeCheatReported()).isFalse();
+    }
+
+    @Test
+    void reportCheatRejectsSelfReport() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.setLastDiceValue(1);
+
+        ClientCommand cmd = new ClientCommand(CommandType.REPORT_CHEAT, "lobby-1", "player-1", null, null);
+        cmd.setReportedPlayerId("player-1");
+
+        assertThatThrownBy(() -> service.processCommand(state, cmd))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Cannot report yourself");
+    }
+
+    @Test
+    void reportCheatRejectsInLobbyPhase() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = new GameRoomState();
+        state.setPhase(GamePhase.LOBBY);
+        state.setPlayers(defaultPlayers());
+        state.setCurrentPlayerId("player-1");
+
+        ClientCommand cmd = new ClientCommand(CommandType.REPORT_CHEAT, "lobby-1", "player-1", null, null);
+        cmd.setReportedPlayerId("player-2");
+
+        assertThatThrownBy(() -> service.processCommand(state, cmd))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("during active game");
+    }
+
+    @Test
+    void reportCheatRejectsWhenGameOver() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.setGameOver(true);
+
+        ClientCommand cmd = new ClientCommand(CommandType.REPORT_CHEAT, "lobby-1", "player-1", null, null);
+        cmd.setReportedPlayerId("player-2");
+
+        assertThatThrownBy(() -> service.processCommand(state, cmd))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Game already over");
+    }
+
+    @Test
+    void reportCheatRejectsMissingTarget() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+
+        ClientCommand cmd = new ClientCommand(CommandType.REPORT_CHEAT, "lobby-1", "player-1", null, null);
+        // reportedPlayerId left null
+
+        assertThatThrownBy(() -> service.processCommand(state, cmd))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("reportedPlayerId is required");
+    }
+
+    @Test
+    void reportCheatRejectsUnknownTarget() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+
+        ClientCommand cmd = new ClientCommand(CommandType.REPORT_CHEAT, "lobby-1", "player-1", null, null);
+        cmd.setReportedPlayerId("ghost-player");
+
+        assertThatThrownBy(() -> service.processCommand(state, cmd))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Player is not in lobby");
+    }
+
+    @Test
+    void secondReportAfterSuccessfulOneTreatsReporterAsFalse() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = threePlayers();
+        PlayerState cheater = players.get(2); // player-3
+        cheater.setShakeCheatUsedThisRoll(true);
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(1);
+
+        // First report by player-1 hits.
+        ClientCommand first = new ClientCommand(CommandType.REPORT_CHEAT, "lobby-1", "player-1", null, null);
+        first.setReportedPlayerId("player-3");
+        service.processCommand(state, first);
+
+        assertThat(cheater.isMustSkipNextTurn()).isTrue();
+        assertThat(cheater.isShakeCheatReported()).isTrue();
+
+        // Second report by player-2 against the same cheater: now treated as false report.
+        ClientCommand second = new ClientCommand(CommandType.REPORT_CHEAT, "lobby-1", "player-2", null, null);
+        second.setReportedPlayerId("player-3");
+        service.processCommand(state, second);
+
+        assertThat(players.get(1).isMustSkipNextTurn()).isTrue(); // player-2 penalized
+        assertThat(cheater.isMustSkipNextTurn()).isTrue();        // still scheduled for skip (unchanged)
+    }
+
+    // ========== SKIP-ROTATION TESTS ==========
+
+    @Test
+    void endTurnSkipsPlayerWithMustSkipFlagAndConsumesIt() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = threePlayers();
+        players.get(1).setMustSkipNextTurn(true); // player-2 should be skipped
+
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(3);
+        state.getPlayers().getFirst().setRemainingSteps(3);
+
+        service.processCommand(state, new ClientCommand(CommandType.END_TURN, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getCurrentPlayerId()).isEqualTo("player-3");
+        assertThat(players.get(1).isMustSkipNextTurn()).isFalse();
+    }
+
+    @Test
+    void endTurnDoesNotSkipUnflaggedPlayers() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = threePlayers();
+        // no skip flags
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(3);
+        state.getPlayers().getFirst().setRemainingSteps(3);
+
+        service.processCommand(state, new ClientCommand(CommandType.END_TURN, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getCurrentPlayerId()).isEqualTo("player-2");
+    }
+
+    @Test
+    void endTurnSkipsMultipleConsecutivePlayersWithFlags() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = threePlayers();
+        players.get(1).setMustSkipNextTurn(true);
+        players.get(2).setMustSkipNextTurn(true);
+
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(3);
+        state.getPlayers().getFirst().setRemainingSteps(3);
+
+        service.processCommand(state, new ClientCommand(CommandType.END_TURN, "lobby-1", "player-1", null, null));
+
+        // Both player-2 and player-3 are skipped, rotation lands back at player-1.
+        assertThat(state.getCurrentPlayerId()).isEqualTo("player-1");
+        assertThat(players.get(1).isMustSkipNextTurn()).isFalse();
+        assertThat(players.get(2).isMustSkipNextTurn()).isFalse();
+    }
+
+    @Test
+    void rollDiceClearsShakeCheatReportedFlagForAllPlayers() {
+        GameCommandService service = new GameCommandService(new FixedRandom(2));
+        List<PlayerState> players = defaultPlayers();
+        players.get(1).setShakeCheatUsedThisRoll(true);
+        players.get(1).setShakeCheatReported(true);
+        GameRoomState state = inTurnState(players);
+
+        service.processCommand(state, new ClientCommand(CommandType.ROLL_DICE, "lobby-1", "player-1", null, null));
+
+        assertThat(players.get(1).isShakeCheatUsedThisRoll()).isFalse();
+        assertThat(players.get(1).isShakeCheatReported()).isFalse();
+    }
+
     @Test
     void endTurnClearsValidMoveIds() {
         GameCommandService service = new GameCommandService(new FixedRandom(2));
@@ -595,6 +796,14 @@ class GameCommandServiceUnitTest {
         PlayerState p2 = new PlayerState("player-2");
         p2.setCurrentCity(new City("paris", "Paris", Continent.EUROPE_AFRICA, CityColor.GREEN));
         players.add(p2);
+        return players;
+    }
+
+    private List<PlayerState> threePlayers() {
+        List<PlayerState> players = defaultPlayers();
+        PlayerState p3 = new PlayerState("player-3");
+        p3.setCurrentCity(new City("london", "London", Continent.EUROPE_AFRICA, CityColor.GREEN));
+        players.add(p3);
         return players;
     }
 

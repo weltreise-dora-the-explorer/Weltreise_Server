@@ -217,7 +217,7 @@ public class GameCommandService {
         PlayerState playerState = findPlayerState(state.getPlayers(), command.getPlayerId());
         playerState.setBoardPosition(playerState.getBoardPosition() + moveSteps);
 
-        String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+        String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
         state.setCurrentPlayerId(nextPlayerId);
         state.setLastDiceValue(null);
         state.setVersion(state.getVersion() + 1);
@@ -289,7 +289,7 @@ public class GameCommandService {
         if (newRemainingSteps <= 0) {
             player.setRemainingSteps(0);
             player.setPreviousCityId(null);
-            String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+            String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
             state.setCurrentPlayerId(nextPlayerId);
             state.setLastDiceValue(null);
         }
@@ -314,7 +314,7 @@ public class GameCommandService {
         player.setRemainingSteps(0);
         player.setPreviousCityId(null);
 
-        String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+        String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
         state.setCurrentPlayerId(nextPlayerId);
         state.setLastDiceValue(null);
         recomputeValidMoveIds(state);
@@ -409,7 +409,7 @@ public class GameCommandService {
         if(targetPlayer.getRemainingSteps() <= 0) {
             targetPlayer.setRemainingSteps(0);
             targetPlayer.setPreviousCityId(null);
-            String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+            String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
             state.setCurrentPlayerId(nextPlayerId);
             state.setLastDiceValue(null);
             state.setValidMoveIds(new ArrayList<>());
@@ -490,7 +490,7 @@ public class GameCommandService {
         if(player.getRemainingSteps() <= 0){
             player.setRemainingSteps(0);
             player.setPreviousCityId(null);
-            String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+            String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
             state.setCurrentPlayerId(nextPlayerId);
             state.setLastDiceValue(null);
             state.setValidMoveIds(new ArrayList<>());
@@ -709,5 +709,25 @@ public class GameCommandService {
 
         int nextIndex = (currentIndex + 1) % players.size();
         return players.get(nextIndex).getPlayerId();
+    }
+
+    /**
+     * Wie {@link #nextPlayerId}, ueberspringt aber Spieler mit mustSkipNextTurn.
+     * Das Flag wird konsumiert (auf false gesetzt), sobald der Spieler uebersprungen
+     * wurde. Safety-Counter verhindert eine Endlosschleife, falls alle Spieler
+     * gleichzeitig skip-markiert sind.
+     */
+    private String nextPlayerHonoringSkips(List<PlayerState> players, String currentPlayerId) {
+        String next = nextPlayerId(players, currentPlayerId);
+        int safety = players.size();
+        while (safety-- > 0) {
+            PlayerState candidate = findPlayerState(players, next);
+            if (!candidate.isMustSkipNextTurn()) {
+                return next;
+            }
+            candidate.setMustSkipNextTurn(false);
+            next = nextPlayerId(players, next);
+        }
+        return next;
     }
 }

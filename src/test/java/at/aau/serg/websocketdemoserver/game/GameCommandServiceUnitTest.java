@@ -588,10 +588,10 @@ class GameCommandServiceUnitTest {
     }
 
     @Test
-    void reportCheatMissPenalizesReporter() {
+    void reportCheatMissByCurrentPlayerForfeitsCurrentTurn() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
         List<PlayerState> players = defaultPlayers();
-        // player-2 did not cheat
+        // player-2 did not cheat; reporter player-1 is the current player
         GameRoomState state = inTurnState(players);
         state.setLastDiceValue(1);
 
@@ -600,9 +600,31 @@ class GameCommandServiceUnitTest {
 
         service.processCommand(state, cmd);
 
-        assertThat(players.getFirst().isMustSkipNextTurn()).isTrue();
+        // Reporter loses the current turn immediately instead of being scheduled for the next one.
+        assertThat(state.getCurrentPlayerId()).isEqualTo("player-2");
+        assertThat(state.getLastDiceValue()).isNull();
+        assertThat(players.getFirst().isMustSkipNextTurn()).isFalse();
         assertThat(players.get(1).isMustSkipNextTurn()).isFalse();
         assertThat(players.get(1).isShakeCheatReported()).isFalse();
+    }
+
+    @Test
+    void reportCheatMissByNonCurrentPlayerSkipsNextTurn() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        // player-2 did not cheat; reporter player-2 is NOT the current player
+        GameRoomState state = inTurnState(players);
+        state.setLastDiceValue(1);
+
+        ClientCommand cmd = new ClientCommand(CommandType.REPORT_CHEAT, "lobby-1", "player-2", null, null);
+        cmd.setReportedPlayerId("player-1");
+
+        service.processCommand(state, cmd);
+
+        // Current turn is untouched; reporter is scheduled to skip the next turn.
+        assertThat(state.getCurrentPlayerId()).isEqualTo("player-1");
+        assertThat(players.get(1).isMustSkipNextTurn()).isTrue();
+        assertThat(players.getFirst().isMustSkipNextTurn()).isFalse();
     }
 
     @Test

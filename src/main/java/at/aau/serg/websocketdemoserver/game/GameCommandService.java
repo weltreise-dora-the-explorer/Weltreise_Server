@@ -546,7 +546,17 @@ public class GameCommandService {
         if (hit) {
             reported.setShakeCheatReported(true);
             reported.setMustSkipNextTurn(true);
+        } else if (command.getPlayerId().equals(state.getCurrentPlayerId())) {
+            // Falschmeldung waehrend des eigenen Zugs: der Melder verliert sofort
+            // den aktuellen Zug, statt erst die naechste Runde ausgesetzt zu werden.
+            reporter.setRemainingSteps(0);
+            reporter.setPreviousCityId(null);
+            String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
+            state.setCurrentPlayerId(nextPlayerId);
+            state.setLastDiceValue(null);
+            recomputeValidMoveIds(state);
         } else {
+            // Falschmeldung ausserhalb des eigenen Zugs: naechster Zug wird ausgesetzt.
             reporter.setMustSkipNextTurn(true);
         }
 

@@ -113,7 +113,7 @@ public class WebSocketBrokerController {
                 }
                 case RESET_LOBBY -> lobbyService.resetLobby(command.getLobbyId(), command.getPlayerId());
 
-                case ROLL_DICE, MOVE_TOKEN, MOVE_TO_CITY, END_TURN, START_MINIGAME, ANNOUNCE_MINIGAME_RESULT, FINISH_MINIGAME, USE_FREE_PASS, USE_SHAKE_CHEAT, REPORT_CHEAT -> {
+                case ROLL_DICE, MOVE_TOKEN, MOVE_TO_CITY, END_TURN, START_MINIGAME, ANNOUNCE_MINIGAME_RESULT, FINISH_MINIGAME, REACTION_READY, REACTION_PRESS, USE_FREE_PASS, USE_SHAKE_CHEAT, REPORT_CHEAT -> {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
                             .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
                     gameCommandService.processCommand(existingState, command);

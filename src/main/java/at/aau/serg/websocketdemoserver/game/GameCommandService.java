@@ -140,6 +140,16 @@ public class GameCommandService {
             return;
         }
 
+        if(command.getType() == CommandType.REACTION_READY){
+            handleReactionReady(state, command);
+            return;
+        }
+
+        if(command.getType() == CommandType.REACTION_PRESS){
+            handleReactionPress(state, command);
+            return;
+        }
+
         if(command.getType() == CommandType.USE_FREE_PASS){
             handleUseFreePass(state, command);
             return;
@@ -345,6 +355,72 @@ public class GameCommandService {
         }
 
         state.setPhase(GamePhase.MINIGAME);
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleReactionReady(GameRoomState state, ClientCommand command) {
+        if(state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Reaction ready is only allowed during minigame phase");
+        }
+
+        findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(!state.getReactionReadyPlayerIds().contains(command.getPlayerId())) {
+            state.getReactionReadyPlayerIds().add(command.getPlayerId());
+        }
+
+        boolean allPlayersReady = state.getPlayers().stream()
+                .allMatch(player -> state.getReactionReadyPlayerIds().contains(player.getPlayerId()));
+
+        if(allPlayersReady && state.getReactionStartTimeMs() == null) {
+            long countdownStartTimeMs = System.currentTimeMillis();
+            long randomWaitTimeMs = 900 + random.nextInt(901);
+
+            state.setReactionStartTimeMs(countdownStartTimeMs);
+            state.setReactionButtonVisibleAtMs(
+                    countdownStartTimeMs + 3000 + randomWaitTimeMs
+            );
+        }
+
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleReactionPress(GameRoomState state, ClientCommand command) {
+        if(state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Reaction press is only allowed during minigame phase");
+        }
+
+        findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(state.getReactionButtonVisibleAtMs() == null) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Reaction button is not available yet");
+        }
+
+        long now = System.currentTimeMillis();
+
+        if(now < state.getReactionButtonVisibleAtMs()) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Reaction button was pressed too early");
+        }
+
+        if(state.getReactionPressTimesMs().containsKey(command.getPlayerId())) {
+            return;
+        }
+
+        long reactionTimeMs = now - state.getReactionButtonVisibleAtMs();
+        state.getReactionPressTimesMs().put(command.getPlayerId(), reactionTimeMs);
+
+        boolean allPlayersPressed = state.getPlayers().stream()
+                .allMatch(player -> state.getReactionPressTimesMs().containsKey(player.getPlayerId()));
+
+        if(allPlayersPressed) {
+            String winnerPlayerId = state.getReactionPressTimesMs().entrySet().stream()
+                    .min(java.util.Map.Entry.comparingByValue())
+                    .map(java.util.Map.Entry::getKey)
+                    .orElse(command.getPlayerId());
+
+            state.setMinigameWinnerPlayerId(winnerPlayerId);
+        }
+
         state.setVersion(state.getVersion() + 1);
     }
 

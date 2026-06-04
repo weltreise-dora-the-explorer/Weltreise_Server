@@ -306,6 +306,55 @@ class GameCommandServiceUnitTest {
         assertThat(state.getVersion()).isEqualTo(1L);
     }
 
+    // Regression: a lost minigame previously always handed out the same city
+    // (findFirst) and could even hand out another player's start city, because
+    // start cities live outside ownedCities. The replacement must now be picked
+    // randomly from the eligible cities and must never be a start city.
+    @Test
+    void finishMinigameReplacementIsRandomAndNeverAStartCity() {
+        // Reference distributor loads the exact same cities.json order the
+        // service uses internally, so we can reason about which city is picked.
+        CityDistributor reference = new CityDistributor();
+        reference.loadCitiesFromJson();
+        List<City> allCities = reference.getAllCities();
+
+        // FixedRandom(0) -> the service picks the FIRST eligible candidate.
+        GameCommandService service = new GameCommandService(new FixedRandom(0));
+
+        List<PlayerState> players = defaultPlayers();
+        PlayerState targetPlayer = players.getFirst();
+        PlayerState winner = players.get(1);
+
+        City lostCity = allCities.get(1);
+        targetPlayer.setCurrentCity(lostCity);
+        targetPlayer.getOwnedCities().add(lostCity);
+
+        // Make the would-be first pick (index 0) the winner's start city, so the
+        // start-city filter has to skip it. Without the filter the bug returns
+        // this very city as the replacement.
+        winner.setStartCity(allCities.get(0));
+
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+
+        ClientCommand command = new ClientCommand(
+                CommandType.FINISH_MINIGAME, "lobby-1", "player-1", null, null);
+        command.setWinnerPlayerId("player-2");
+
+        service.processCommand(state, command);
+
+        assertThat(winner.getFreePassCount()).isEqualTo(1);
+        assertThat(targetPlayer.getOwnedCities()).hasSize(1);
+        City replacement = targetPlayer.getOwnedCities().getFirst();
+
+        // Not the lost city, and crucially not the start city that was skipped.
+        assertThat(replacement.getId()).isNotEqualTo(lostCity.getId());
+        assertThat(replacement.getId()).isNotEqualTo(allCities.get(0).getId());
+        // Deterministic result: index 0 (start city) and index 1 (lost city) are
+        // filtered out, so the first eligible candidate is index 2.
+        assertThat(replacement.getId()).isEqualTo(allCities.get(2).getId());
+    }
+
     @Test
     void finishMinigameKeepsCurrentPlayerWhenStepsRemain() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));

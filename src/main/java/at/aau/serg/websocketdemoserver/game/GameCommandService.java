@@ -601,16 +601,29 @@ public class GameCommandService {
 
         targetPlayer.getOwnedCities().removeIf(city -> city.getId().equals(lostCity.getId()));
 
-        City replacementCity = cityDistributor.getAllCities().stream()
+        List<City> candidates = cityDistributor.getAllCities().stream()
                 .filter(city -> !city.getId().equals(lostCity.getId()))
                 .filter(city -> !containsCityById(targetPlayer.getOwnedCities(), city.getId()))
                 .filter(city -> !containsCityById(targetPlayer.getVisitedCities(), city.getId()))
                 .filter(city -> !isCityAssignedToAnyPlayer(state.getPlayers(), city.getId()))
-                .findFirst()
-                .orElseThrow(() -> new GameException(ErrorCode.INVALID_COMMAND, "No replacement city available"));
+                .filter(city -> !isStartCityOfAnyPlayer(state.getPlayers(), city.getId()))
+                .toList();
+
+        if (candidates.isEmpty()) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "No replacement city available");
+        }
+
+        // Zufällige Ersatzstadt statt immer der ersten aus der Liste.
+        City replacementCity = candidates.get(random.nextInt(candidates.size()));
 
         targetPlayer.getOwnedCities().add(replacementCity);
         state.setMinigameNewCityName(replacementCity.getName());
+    }
+
+    private boolean isStartCityOfAnyPlayer(List<PlayerState> players, String cityId) {
+        return players.stream()
+                .anyMatch(p -> p.getStartCity() != null
+                        && p.getStartCity().getId().equals(cityId));
     }
 
     private boolean containsCityById(List<City> cities, String cityId) {

@@ -145,6 +145,16 @@ public class GameCommandService {
             return;
         }
 
+        if(command.getType() == CommandType.USE_SHAKE_CHEAT){
+            handleShakeCheat(state, command);
+            return;
+        }
+
+        if(command.getType() == CommandType.REPORT_CHEAT){
+            handleReportCheat(state, command);
+            return;
+        }
+
         throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type for turn flow");
     }
 
@@ -179,6 +189,13 @@ public class GameCommandService {
         PlayerState currentPlayer = findPlayerState(state.getPlayers(), command.getPlayerId());
         currentPlayer.setRemainingSteps(diceValue);
 
+        // Report-Window schliesst sich bei jedem Wurf, egal welcher Spieler rollt:
+        // alle Cheat-Beweise auf null setzen.
+        for (PlayerState p : state.getPlayers()) {
+            p.setShakeCheatUsedThisRoll(false);
+            p.setShakeCheatReported(false);
+        }
+
         recomputeValidMoveIds(state);
         state.setVersion(state.getVersion() + 1);
     }
@@ -200,7 +217,7 @@ public class GameCommandService {
         PlayerState playerState = findPlayerState(state.getPlayers(), command.getPlayerId());
         playerState.setBoardPosition(playerState.getBoardPosition() + moveSteps);
 
-        String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+        String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
         state.setCurrentPlayerId(nextPlayerId);
         state.setLastDiceValue(null);
         state.setVersion(state.getVersion() + 1);
@@ -272,7 +289,7 @@ public class GameCommandService {
         if (newRemainingSteps <= 0) {
             player.setRemainingSteps(0);
             player.setPreviousCityId(null);
-            String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+            String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
             state.setCurrentPlayerId(nextPlayerId);
             state.setLastDiceValue(null);
         }
@@ -297,7 +314,7 @@ public class GameCommandService {
         player.setRemainingSteps(0);
         player.setPreviousCityId(null);
 
-        String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+        String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
         state.setCurrentPlayerId(nextPlayerId);
         state.setLastDiceValue(null);
         recomputeValidMoveIds(state);
@@ -392,7 +409,7 @@ public class GameCommandService {
         if(targetPlayer.getRemainingSteps() <= 0) {
             targetPlayer.setRemainingSteps(0);
             targetPlayer.setPreviousCityId(null);
-            String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+            String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
             state.setCurrentPlayerId(nextPlayerId);
             state.setLastDiceValue(null);
             state.setValidMoveIds(new ArrayList<>());
@@ -473,12 +490,74 @@ public class GameCommandService {
         if(player.getRemainingSteps() <= 0){
             player.setRemainingSteps(0);
             player.setPreviousCityId(null);
-            String nextPlayerId = nextPlayerId(state.getPlayers(), state.getCurrentPlayerId());
+            String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
             state.setCurrentPlayerId(nextPlayerId);
             state.setLastDiceValue(null);
             state.setValidMoveIds(new ArrayList<>());
         } else {
             recomputeValidMoveIds(state);
+        }
+
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleShakeCheat(GameRoomState state, ClientCommand command) {
+        validateTurnContext(state, command);
+
+        PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if (player.getRemainingSteps() != 1) {
+            throw new GameException(ErrorCode.SHAKE_CHEAT_NOT_ALLOWED,
+                    "Shake cheat only allowed with exactly 1 remaining step");
+        }
+
+        if (player.isShakeCheatUsedThisRoll()) {
+            throw new GameException(ErrorCode.SHAKE_CHEAT_NOT_ALLOWED,
+                    "Shake cheat already used in this dice roll");
+        }
+
+        player.setShakeCheatUsedThisRoll(true);
+        player.setRemainingSteps(2);
+
+        recomputeValidMoveIds(state);
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleReportCheat(GameRoomState state, ClientCommand command) {
+        if (state.isGameOver()) {
+            throw new GameException(ErrorCode.REPORT_NOT_ALLOWED, "Game already over");
+        }
+        if (state.getPhase() == GamePhase.LOBBY) {
+            throw new GameException(ErrorCode.REPORT_NOT_ALLOWED, "Reports only allowed during active game");
+        }
+
+        String reportedPlayerId = command.getReportedPlayerId();
+        if (reportedPlayerId == null || reportedPlayerId.isBlank()) {
+            throw new GameException(ErrorCode.REPORT_NOT_ALLOWED, "reportedPlayerId is required");
+        }
+        if (reportedPlayerId.equals(command.getPlayerId())) {
+            throw new GameException(ErrorCode.REPORT_NOT_ALLOWED, "Cannot report yourself");
+        }
+
+        PlayerState reporter = findPlayerState(state.getPlayers(), command.getPlayerId());
+        PlayerState reported = findPlayerState(state.getPlayers(), reportedPlayerId);
+
+        boolean hit = reported.isShakeCheatUsedThisRoll() && !reported.isShakeCheatReported();
+        if (hit) {
+            reported.setShakeCheatReported(true);
+            reported.setMustSkipNextTurn(true);
+        } else if (command.getPlayerId().equals(state.getCurrentPlayerId())) {
+            // Falschmeldung waehrend des eigenen Zugs: der Melder verliert sofort
+            // den aktuellen Zug, statt erst die naechste Runde ausgesetzt zu werden.
+            reporter.setRemainingSteps(0);
+            reporter.setPreviousCityId(null);
+            String nextPlayerId = nextPlayerHonoringSkips(state.getPlayers(), state.getCurrentPlayerId());
+            state.setCurrentPlayerId(nextPlayerId);
+            state.setLastDiceValue(null);
+            recomputeValidMoveIds(state);
+        } else {
+            // Falschmeldung ausserhalb des eigenen Zugs: naechster Zug wird ausgesetzt.
+            reporter.setMustSkipNextTurn(true);
         }
 
         state.setVersion(state.getVersion() + 1);
@@ -640,5 +719,25 @@ public class GameCommandService {
 
         int nextIndex = (currentIndex + 1) % players.size();
         return players.get(nextIndex).getPlayerId();
+    }
+
+    /**
+     * Wie {@link #nextPlayerId}, ueberspringt aber Spieler mit mustSkipNextTurn.
+     * Das Flag wird konsumiert (auf false gesetzt), sobald der Spieler uebersprungen
+     * wurde. Safety-Counter verhindert eine Endlosschleife, falls alle Spieler
+     * gleichzeitig skip-markiert sind.
+     */
+    private String nextPlayerHonoringSkips(List<PlayerState> players, String currentPlayerId) {
+        String next = nextPlayerId(players, currentPlayerId);
+        int safety = players.size();
+        while (safety-- > 0) {
+            PlayerState candidate = findPlayerState(players, next);
+            if (!candidate.isMustSkipNextTurn()) {
+                return next;
+            }
+            candidate.setMustSkipNextTurn(false);
+            next = nextPlayerId(players, next);
+        }
+        return next;
     }
 }

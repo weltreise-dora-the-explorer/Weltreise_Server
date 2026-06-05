@@ -284,6 +284,7 @@ public class GameCommandService {
             state.setValidMoveIds(new ArrayList<>());
 
             if (player.getFreePassCount() <= 0) {
+                resetReactionMinigameState(state);
                 state.setPhase(GamePhase.MINIGAME);
             }
 
@@ -354,6 +355,7 @@ public class GameCommandService {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Target city is already completed");
         }
 
+        resetReactionMinigameState(state);
         state.setPhase(GamePhase.MINIGAME);
         state.setVersion(state.getVersion() + 1);
     }
@@ -696,6 +698,14 @@ public class GameCommandService {
     private boolean isCityAssignedToAnyPlayer(List<PlayerState> players, String cityId) {
         return players.stream()
                 .anyMatch(player -> containsCityById(player.getOwnedCities(), cityId));
+    }
+
+    private void resetReactionMinigameState(GameRoomState state) {
+        state.getReactionReadyPlayerIds().clear();
+        state.setReactionStartTimeMs(null);
+        state.setReactionButtonVisibleAtMs(null);
+        state.getReactionPressTimesMs().clear();
+        state.setMinigameWinnerPlayerId(null);
     }
 
     private void recomputeValidMoveIds(GameRoomState state) {

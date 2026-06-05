@@ -33,12 +33,14 @@ public class GameRoomState {
     private String minigameNewCityName;
 
     private List<String> reactionReadyPlayerIds = new ArrayList<>();
+    private Long reactionReadyEndsAtMs;
+    private Long reactionRoundEndsAtMs;
     private Long reactionStartTimeMs;
     private Long reactionButtonVisibleAtMs;
     private java.util.Map<String, Long> reactionPressTimesMs = new java.util.HashMap<>();
 
     public GameRoomState(String lobbyId, String hostId, List<PlayerState> players,
                          GamePhase phase, String currentPlayerId, Integer lastDiceValue, long version) {
-        this(lobbyId, hostId, players, phase, currentPlayerId, lastDiceValue, version, new ArrayList<>(), GameMode.CITY_HOPPER, false, null, null, null, new ArrayList<>(), null, null, new java.util.HashMap<>());
+        this(lobbyId, hostId, players, phase, currentPlayerId, lastDiceValue, version, new ArrayList<>(), GameMode.CITY_HOPPER, false, null, null, null, new ArrayList<>(), null, null, null, null, new java.util.HashMap<>());
     }
 }

@@ -374,13 +374,26 @@ public class GameCommandService {
         boolean allPlayersReady = state.getPlayers().stream()
                 .allMatch(player -> state.getReactionReadyPlayerIds().contains(player.getPlayerId()));
 
+        if(state.getReactionReadyEndsAtMs() == null) {
+            state.setReactionReadyEndsAtMs(System.currentTimeMillis() + 60_000);
+        }
+
+        long now = System.currentTimeMillis();
+        startReactionRoundIfReadyTimedOut(state, now);
+
         if(allPlayersReady && state.getReactionStartTimeMs() == null) {
             long countdownStartTimeMs = System.currentTimeMillis();
-            long randomWaitTimeMs = 900 + random.nextInt(901);
+            long randomWaitTimeMs = 1000 + random.nextInt(5000);
 
             state.setReactionStartTimeMs(countdownStartTimeMs);
-            state.setReactionButtonVisibleAtMs(
-                    countdownStartTimeMs + 3000 + randomWaitTimeMs
+
+            long buttonVisibleAtMs =
+                    countdownStartTimeMs + 3000 + randomWaitTimeMs;
+
+            state.setReactionButtonVisibleAtMs(buttonVisibleAtMs);
+
+            state.setReactionRoundEndsAtMs(
+                    buttonVisibleAtMs + 60_000
             );
         }
 
@@ -399,6 +412,13 @@ public class GameCommandService {
         }
 
         long now = System.currentTimeMillis();
+
+        finishReactionRoundIfTimedOut(state, now);
+
+        if(state.getMinigameWinnerPlayerId() != null) {
+            state.setVersion(state.getVersion() + 1);
+            return;
+        }
 
         if(now < state.getReactionButtonVisibleAtMs()) {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Reaction button was pressed too early");
@@ -706,6 +726,54 @@ public class GameCommandService {
         state.setReactionButtonVisibleAtMs(null);
         state.getReactionPressTimesMs().clear();
         state.setMinigameWinnerPlayerId(null);
+    }
+
+    private void finishReactionRoundIfTimedOut(GameRoomState state, long now) {
+        if(state.getReactionRoundEndsAtMs() == null) {
+            return;
+        }
+
+        if(now < state.getReactionRoundEndsAtMs()) {
+            return;
+        }
+
+        for(PlayerState player : state.getPlayers()) {
+            state.getReactionPressTimesMs().putIfAbsent(
+                    player.getPlayerId(),
+                    60_000L
+            );
+        }
+
+        if(state.getMinigameWinnerPlayerId() == null) {
+            String winnerPlayerId = state.getReactionPressTimesMs().entrySet().stream()
+                    .min(java.util.Map.Entry.comparingByValue())
+                    .map(java.util.Map.Entry::getKey)
+                    .orElse(state.getCurrentPlayerId());
+
+            state.setMinigameWinnerPlayerId(winnerPlayerId);
+        }
+    }
+
+    private void startReactionRoundIfReadyTimedOut(GameRoomState state, long now) {
+        if(state.getReactionReadyEndsAtMs() == null) {
+            return;
+        }
+
+        if(state.getReactionStartTimeMs() != null) {
+            return;
+        }
+
+        if(now < state.getReactionReadyEndsAtMs()) {
+            return;
+        }
+
+        long randomWaitTimeMs = 1000 + random.nextInt(5000);
+
+        state.setReactionStartTimeMs(now);
+
+        long buttonVisibleAtMs = now + 3000 + randomWaitTimeMs;
+        state.setReactionButtonVisibleAtMs(buttonVisibleAtMs);
+        state.setReactionRoundEndsAtMs(buttonVisibleAtMs + 60_000);
     }
 
     private void recomputeValidMoveIds(GameRoomState state) {

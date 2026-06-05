@@ -722,8 +722,10 @@ public class GameCommandService {
 
     private void resetReactionMinigameState(GameRoomState state) {
         state.getReactionReadyPlayerIds().clear();
+        state.setReactionReadyEndsAtMs(null);
         state.setReactionStartTimeMs(null);
         state.setReactionButtonVisibleAtMs(null);
+        state.setReactionRoundEndsAtMs(null);
         state.getReactionPressTimesMs().clear();
         state.setMinigameWinnerPlayerId(null);
     }

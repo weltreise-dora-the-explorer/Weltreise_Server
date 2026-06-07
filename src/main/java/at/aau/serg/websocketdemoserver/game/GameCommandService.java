@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameOverMessage;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GoalReachedMessage;
+import at.aau.serg.websocketdemoserver.messaging.dtos.MinigameLostMessage;
 import at.aau.serg.websocketdemoserver.messaging.dtos.PlayerScore;
 import at.aau.serg.websocketdemoserver.websocket.broker.WebSocketTopics;
 
@@ -684,7 +685,7 @@ public class GameCommandService {
         if (messagingTemplate == null || lobbyId == null || playerId == null) return;
         messagingTemplate.convertAndSend(
                 WebSocketTopics.playerEvents(lobbyId, playerId),
-                new at.aau.serg.websocketdemoserver.messaging.dtos.MinigameLostMessage(lostCityName, newCityName)
+                new MinigameLostMessage(lostCityName, newCityName)
         );
     }
 

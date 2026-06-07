@@ -39,16 +39,17 @@ public class GameRoomState {
     private MinigameType selectedMinigame;
     private MinigameSubPhase minigameSubPhase;
     private String guessQuestionText;
-    private int guessQuestionAnswer;
+    private Integer guessQuestionAnswer;
     private long guessTimerEndMillis;
     private Map<String, Integer> guessSubmissions = new HashMap<>();
     private Map<String, Long> guessSubmissionTimestamps = new HashMap<>();
     private Integer timerDurationSeconds;
+    private int minigameGeneration = 0;
 
     public GameRoomState(String lobbyId, String hostId, List<PlayerState> players,
                          GamePhase phase, String currentPlayerId, Integer lastDiceValue, long version) {
         this(lobbyId, hostId, players, phase, currentPlayerId, lastDiceValue, version,
                 new ArrayList<>(), GameMode.CITY_HOPPER, false, null, null, null,
-                null, null, null, 0, 0L, new HashMap<>(), new HashMap<>(), null);
+                null, null, null, null, 0L, new HashMap<>(), new HashMap<>(), null, 0);
     }
 }

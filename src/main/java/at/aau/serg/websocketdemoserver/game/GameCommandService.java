@@ -418,6 +418,9 @@ public class GameCommandService {
         state.getGuessSubmissions().clear();
         state.getGuessSubmissionTimestamps().clear();
 
+        state.setMinigameGeneration(state.getMinigameGeneration() + 1);
+        final int generation = state.getMinigameGeneration();
+
         state.setSelectedMinigame(selectedType);
         state.setGuessQuestionText(question.getQuestionText());
         state.setGuessQuestionAnswer((int) question.getCorrectAnswer());
@@ -428,7 +431,8 @@ public class GameCommandService {
         String lobbyId = state.getLobbyId();
 
         executor.schedule(() -> {
-            if (state.getMinigameSubPhase() == MinigameSubPhase.SELECTING) {
+            if (state.getMinigameGeneration() == generation
+                    && state.getMinigameSubPhase() == MinigameSubPhase.SELECTING) {
                 state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
                 state.setGuessTimerEndMillis(System.currentTimeMillis() + 35_000L);
                 state.setTimerDurationSeconds(30);
@@ -436,16 +440,17 @@ public class GameCommandService {
                 if (lobbyStore != null) lobbyStore.save();
                 broadcastState(lobbyId, state);
             }
-        }, 3, TimeUnit.SECONDS);
+        }, 6, TimeUnit.SECONDS);
 
         executor.schedule(() -> {
-            if (state.getMinigameSubPhase() != MinigameSubPhase.RESULT) {
+            if (state.getMinigameGeneration() == generation
+                    && state.getMinigameSubPhase() != MinigameSubPhase.RESULT) {
                 evaluateGuessGame(state);
                 state.setVersion(state.getVersion() + 1);
                 if (lobbyStore != null) lobbyStore.save();
                 broadcastState(lobbyId, state);
             }
-        }, 33, TimeUnit.SECONDS);
+        }, 36, TimeUnit.SECONDS);
     }
 
     private void handleFinishMinigame(GameRoomState state, ClientCommand command) {
@@ -504,6 +509,10 @@ public class GameCommandService {
         } else {
             winner.setFreePassCount(winner.getFreePassCount() + 1);
             replaceCurrentTargetCity(state, targetPlayer);
+            sendMinigameLost(state.getLobbyId(), targetPlayer.getPlayerId(),
+                    state.getMinigameLostCityName(), state.getMinigameNewCityName());
+            state.setMinigameLostCityName(null);
+            state.setMinigameNewCityName(null);
         }
 
         if(targetPlayer.getRemainingSteps() <= 0) {
@@ -521,7 +530,7 @@ public class GameCommandService {
         state.setMinigameSubPhase(null);
         state.setSelectedMinigame(null);
         state.setGuessQuestionText(null);
-        state.setGuessQuestionAnswer(0);
+        state.setGuessQuestionAnswer(null);
         state.setGuessTimerEndMillis(0L);
         state.setTimerDurationSeconds(null);
         state.getGuessSubmissions().clear();
@@ -669,6 +678,14 @@ public class GameCommandService {
         }
 
         state.setVersion(state.getVersion() + 1);
+    }
+
+    private void sendMinigameLost(String lobbyId, String playerId, String lostCityName, String newCityName) {
+        if (messagingTemplate == null || lobbyId == null || playerId == null) return;
+        messagingTemplate.convertAndSend(
+                WebSocketTopics.playerEvents(lobbyId, playerId),
+                new at.aau.serg.websocketdemoserver.messaging.dtos.MinigameLostMessage(lostCityName, newCityName)
+        );
     }
 
     private void broadcastGoalReached(PlayerState player, City city) {

@@ -1,6 +1,11 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.minigame.GuessQuestion;
+import at.aau.serg.websocketdemoserver.game.minigame.GuessQuestionPool;
+import at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase;
+import at.aau.serg.websocketdemoserver.game.minigame.MinigameType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
+import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameMode;
@@ -10,6 +15,7 @@ import at.aau.serg.websocketdemoserver.game.models.City;
 import at.aau.serg.websocketdemoserver.game.models.CityNode;
 import at.aau.serg.websocketdemoserver.game.models.Connection;
 import at.aau.serg.websocketdemoserver.game.models.PlayerState;
+import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -22,6 +28,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -35,6 +44,19 @@ public class GameCommandService {
     private final GameSessionService gameSessionService;
     private final SimpMessagingTemplate messagingTemplate;
     private final CityDistributor cityDistributor;
+    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+    private final GuessQuestionPool guessQuestionPool = new GuessQuestionPool();
+    private InMemoryLobbyStore lobbyStore;
+
+    @Autowired(required = false)
+    public void setLobbyStore(InMemoryLobbyStore lobbyStore) {
+        this.lobbyStore = lobbyStore;
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        executor.shutdownNow();
+    }
 
     public GameCommandService() {
         this(new Random(), loadWorldGraphSafe(), new MovementEngine(), new GameSessionService(), null, createLoadedCityDistributor());
@@ -156,6 +178,62 @@ public class GameCommandService {
         }
 
         throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type for turn flow");
+    }
+
+    public void handleSubmitGuess(GameRoomState state, String playerId, int guess) {
+        if (state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Command not allowed in current phase");
+        }
+        if (state.getMinigameSubPhase() != MinigameSubPhase.PLAYING) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Guesses can only be submitted during the playing phase");
+        }
+
+        findPlayerState(state.getPlayers(), playerId);
+
+        if (state.getGuessSubmissions().containsKey(playerId)) {
+            return;
+        }
+
+        state.getGuessSubmissions().put(playerId, guess);
+        state.getGuessSubmissionTimestamps().put(playerId, System.currentTimeMillis());
+        state.setVersion(state.getVersion() + 1);
+
+        if (state.getGuessSubmissions().size() == state.getPlayers().size()) {
+            evaluateGuessGame(state);
+            state.setVersion(state.getVersion() + 1);
+        }
+    }
+
+    private void evaluateGuessGame(GameRoomState state) {
+        int answer = state.getGuessQuestionAnswer();
+
+        String winnerId = null;
+        int bestDistance = Integer.MAX_VALUE;
+
+        for (PlayerState player : state.getPlayers()) {
+            Integer playerGuess = state.getGuessSubmissions().get(player.getPlayerId());
+            if (playerGuess == null) continue;
+            int distance = Math.abs(playerGuess - answer);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                winnerId = player.getPlayerId();
+            }
+        }
+
+        if (winnerId == null) {
+            winnerId = state.getCurrentPlayerId();
+        }
+
+        state.setMinigameWinnerPlayerId(winnerId);
+        state.setMinigameSubPhase(MinigameSubPhase.RESULT);
+    }
+
+    private void broadcastState(String lobbyId, GameRoomState state) {
+        if (messagingTemplate == null) return;
+        messagingTemplate.convertAndSend(
+                WebSocketTopics.lobbyEvents(lobbyId),
+                new CommandResponse(true, "OK", null, lobbyId, CommandType.START_MINIGAME, state)
+        );
     }
 
     private void handleUpdateGameMode(GameRoomState state, ClientCommand command) {
@@ -322,30 +400,52 @@ public class GameCommandService {
     }
 
     private void handleStartMinigame(GameRoomState state, ClientCommand command) {
-        validateTurnContext(state, command);
-
-        PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
-
-        if(player.getCurrentCity() == null) {
-            throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
+        if (state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Command not allowed in current phase");
+        }
+        if (state.getCurrentPlayerId() == null) {
+            throw new GameException(ErrorCode.CURRENT_PLAYER_NOT_SET, "Current player is not set");
+        }
+        if (!state.getCurrentPlayerId().equals(command.getPlayerId())) {
+            throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
         }
 
-        boolean isTargetCity = player.getOwnedCities().stream()
-                .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+        MinigameType[] types = MinigameType.values();
+        MinigameType selectedType = types[random.nextInt(types.length)];
 
-        if(!isTargetCity) {
-            throw new GameException(ErrorCode.INVALID_COMMAND, "Minigame can only be started on a target city");
-        }
+        GuessQuestion question = guessQuestionPool.getRandom();
 
-        boolean alreadyCompleted = player.getVisitedCities().stream()
-                .anyMatch(city -> city.getId().equals(player.getCurrentCity().getId()));
+        state.getGuessSubmissions().clear();
+        state.getGuessSubmissionTimestamps().clear();
 
-        if(alreadyCompleted) {
-            throw new GameException(ErrorCode.INVALID_COMMAND, "Target city is already completed");
-        }
-
-        state.setPhase(GamePhase.MINIGAME);
+        state.setSelectedMinigame(selectedType);
+        state.setGuessQuestionText(question.getQuestionText());
+        state.setGuessQuestionAnswer((int) question.getCorrectAnswer());
+        state.setMinigameSubPhase(MinigameSubPhase.SELECTING);
+        state.setGuessTimerEndMillis(0L);
         state.setVersion(state.getVersion() + 1);
+
+        String lobbyId = state.getLobbyId();
+
+        executor.schedule(() -> {
+            if (state.getMinigameSubPhase() == MinigameSubPhase.SELECTING) {
+                state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
+                state.setGuessTimerEndMillis(System.currentTimeMillis() + 35_000L);
+                state.setTimerDurationSeconds(30);
+                state.setVersion(state.getVersion() + 1);
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, 3, TimeUnit.SECONDS);
+
+        executor.schedule(() -> {
+            if (state.getMinigameSubPhase() != MinigameSubPhase.RESULT) {
+                evaluateGuessGame(state);
+                state.setVersion(state.getVersion() + 1);
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, 33, TimeUnit.SECONDS);
     }
 
     private void handleFinishMinigame(GameRoomState state, ClientCommand command) {
@@ -418,6 +518,14 @@ public class GameCommandService {
         }
 
         state.setMinigameWinnerPlayerId(null);
+        state.setMinigameSubPhase(null);
+        state.setSelectedMinigame(null);
+        state.setGuessQuestionText(null);
+        state.setGuessQuestionAnswer(0);
+        state.setGuessTimerEndMillis(0L);
+        state.setTimerDurationSeconds(null);
+        state.getGuessSubmissions().clear();
+        state.getGuessSubmissionTimestamps().clear();
         state.setPhase(GamePhase.IN_TURN);
         state.setVersion(state.getVersion() + 1);
     }

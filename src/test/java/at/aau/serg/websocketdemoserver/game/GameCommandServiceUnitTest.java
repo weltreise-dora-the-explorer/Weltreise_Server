@@ -200,22 +200,24 @@ class GameCommandServiceUnitTest {
     }
 
     @Test
-    void startMinigameSetsPhaseToMinigameAndIncrementsVersion() {
-        GameCommandService service = new GameCommandService(new FixedRandom(1));
+    void startMinigameSetsSubPhaseToSelectingAndIncrementsVersion() {
+        GameCommandService service = new GameCommandService(new FixedRandom(0));
         List<PlayerState> players = defaultPlayers();
-        PlayerState player = players.getFirst();
-        player.getOwnedCities().add(player.getCurrentCity());
 
         GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
 
         service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
 
         assertThat(state.getPhase()).isEqualTo(GamePhase.MINIGAME);
+        assertThat(state.getMinigameSubPhase()).isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.SELECTING);
+        assertThat(state.getSelectedMinigame()).isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameType.GUESS_GAME);
+        assertThat(state.getGuessQuestionText()).isNotNull();
         assertThat(state.getVersion()).isEqualTo(1L);
     }
 
     @Test
-    void startMinigameRejectsWhenCurrentCityIsNotTargetCity() {
+    void startMinigameRejectsWhenNotInMinigamePhase() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
         GameRoomState state = inTurnState(defaultPlayers());
 
@@ -223,24 +225,22 @@ class GameCommandServiceUnitTest {
                 state,
                 new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null)))
                 .isInstanceOf(GameException.class)
-                .hasMessageContaining("target city");
+                .hasMessageContaining("current phase");
     }
 
     @Test
-    void startMinigameRejectsAlreadyCompletedTargetCity() {
+    void startMinigameRejectsWhenNotCurrentPlayer() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
         List<PlayerState> players = defaultPlayers();
-        PlayerState player = players.getFirst();
-        player.getOwnedCities().add(player.getCurrentCity());
-        player.getVisitedCities().add(player.getCurrentCity());
 
         GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
 
         assertThatThrownBy(() -> service.processCommand(
                 state,
-                new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null)))
+                new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-2", null, null)))
                 .isInstanceOf(GameException.class)
-                .hasMessageContaining("already completed");
+                .hasMessageContaining("Not your turn");
     }
 
     @Test
@@ -332,7 +332,7 @@ class GameCommandServiceUnitTest {
         // Make the would-be first pick (index 0) the winner's start city, so the
         // start-city filter has to skip it. Without the filter the bug returns
         // this very city as the replacement.
-        winner.setStartCity(allCities.get(0));
+        winner.setStartCity(allCities.getFirst());
 
         GameRoomState state = inTurnState(players);
         state.setPhase(GamePhase.MINIGAME);

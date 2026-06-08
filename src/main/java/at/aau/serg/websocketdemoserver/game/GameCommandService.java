@@ -383,7 +383,7 @@ public class GameCommandService {
 
         if(allPlayersReady && state.getReactionStartTimeMs() == null) {
             long countdownStartTimeMs = System.currentTimeMillis();
-            long randomWaitTimeMs = 1000 + random.nextInt(5000);
+            long randomWaitTimeMs = 500 + random.nextInt(4501);
 
             state.setReactionStartTimeMs(countdownStartTimeMs);
 
@@ -420,15 +420,18 @@ public class GameCommandService {
             return;
         }
 
-        if(now < state.getReactionButtonVisibleAtMs()) {
+        long visibleAtMs = state.getReactionButtonVisibleAtMs();
+        long earlyToleranceMs = 300L;
+
+        if (now + earlyToleranceMs < visibleAtMs) {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Reaction button was pressed too early");
         }
 
-        if(state.getReactionPressTimesMs().containsKey(command.getPlayerId())) {
+        if (state.getReactionPressTimesMs().containsKey(command.getPlayerId())) {
             return;
         }
 
-        long reactionTimeMs = now - state.getReactionButtonVisibleAtMs();
+        long reactionTimeMs = Math.max(0L, now - visibleAtMs);
         state.getReactionPressTimesMs().put(command.getPlayerId(), reactionTimeMs);
 
         boolean allPlayersPressed = state.getPlayers().stream()
@@ -769,7 +772,7 @@ public class GameCommandService {
             return;
         }
 
-        long randomWaitTimeMs = 1000 + random.nextInt(5000);
+        long randomWaitTimeMs = 500 + random.nextInt(4501);
 
         state.setReactionStartTimeMs(now);
 

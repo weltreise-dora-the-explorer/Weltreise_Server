@@ -44,6 +44,7 @@ public class WebSocketBrokerController {
             CommandType.MOVE_TO_CITY,
             CommandType.END_TURN,
             CommandType.START_MINIGAME,
+            CommandType.SUBMIT_GUESS,
             CommandType.ANNOUNCE_MINIGAME_RESULT,
             CommandType.FINISH_MINIGAME,
             CommandType.USE_FREE_PASS,
@@ -149,6 +150,17 @@ public class WebSocketBrokerController {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
                             .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
                     gameCommandService.processCommand(existingState, command);
+                    lobbyStore.save();
+                    yield existingState;
+                }
+                case SUBMIT_GUESS -> {
+                    GameRoomState existingState = lobbyStore.get(lobbyId)
+                            .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
+                    Integer guess = command.getGuess();
+                    if (guess == null) {
+                        throw new GameException(ErrorCode.INVALID_COMMAND, "Guess value is required");
+                    }
+                    gameCommandService.handleSubmitGuess(existingState, command.getPlayerId(), guess);
                     lobbyStore.save();
                     yield existingState;
                 }

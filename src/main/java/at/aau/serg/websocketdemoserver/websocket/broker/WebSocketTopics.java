@@ -10,4 +10,8 @@ public final class WebSocketTopics {
     public static String lobbyEvents(String lobbyId) {
         return "/topic/lobby/" + lobbyId + "/events";
     }
+
+    public static String playerEvents(String lobbyId, String playerId) {
+        return "/topic/lobby/" + lobbyId + "/player/" + playerId + "/events";
+    }
 }

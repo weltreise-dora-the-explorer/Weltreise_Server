@@ -285,6 +285,7 @@ public class GameCommandService {
 
             if (player.getFreePassCount() <= 0) {
                 resetReactionMinigameState(state);
+                state.setReactionReadyEndsAtMs(System.currentTimeMillis() + 60_000);
                 state.setPhase(GamePhase.MINIGAME);
             }
 

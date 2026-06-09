@@ -238,6 +238,42 @@ class GameCommandServiceUnitTest {
     }
 
     @Test
+    void startFlagGameResetsStaleStateAndBumpsGeneration() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1)); // FLAG_GAME
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.setPhase(GamePhase.MINIGAME);
+
+        // Reste aus einem früheren Minispiel:
+        state.getFlagScores().put("player-1", 3);
+        state.setFlagRoundIndex(4);
+        state.setFlagCorrectName("Germany");
+        state.setMinigameGeneration(7);
+
+        service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getFlagScores()).isEmpty();
+        assertThat(state.getFlagRoundIndex()).isZero();
+        assertThat(state.getFlagCorrectName()).isNull();              // kein Spicken im Intro
+        assertThat(state.getMinigameGeneration()).isEqualTo(8);
+    }
+
+    @Test
+    void startFlagGameGeneratesFiveDistinctValidFlags() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1)); // FLAG_GAME
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.setPhase(GamePhase.MINIGAME);
+
+        service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getFlagRounds()).hasSize(5);
+        assertThat(state.getFlagRounds().stream()
+                .map(at.aau.serg.websocketdemoserver.game.minigame.FlagQuestion::getFlagCode)
+                .distinct()).hasSize(5);
+        state.getFlagRounds().forEach(question ->
+                assertThat(question.getOptions()).hasSize(4).contains(question.getCorrectName()));
+    }
+
+    @Test
     void startMinigameRejectsWhenNotInMinigamePhase() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
         GameRoomState state = inTurnState(defaultPlayers());

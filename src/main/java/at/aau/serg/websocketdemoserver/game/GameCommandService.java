@@ -52,6 +52,7 @@ public class GameCommandService {
     private final FlagQuestionPool flagQuestionPool = new FlagQuestionPool();
     private static final int FLAG_ROUNDS = 5;
     private static final int FLAG_ROUND_SECONDS = 12;
+    private static final int FLAG_REVEAL_SECONDS = 3;
     private InMemoryLobbyStore lobbyStore;
 
     @Autowired(required = false)
@@ -200,11 +201,20 @@ public class GameCommandService {
             return;
         }
 
+        boolean flagGame = state.getSelectedMinigame() == MinigameType.FLAG_GAME;
+        if (flagGame && (guess < 0 || guess >= state.getFlagOptions().size())) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Option index out of range");
+        }
+
         state.getGuessSubmissions().put(playerId, guess);
         state.getGuessSubmissionTimestamps().put(playerId, System.currentTimeMillis());
         state.setVersion(state.getVersion() + 1);
 
-        if (state.getGuessSubmissions().size() == state.getPlayers().size()) {
+        if (flagGame) {
+            if (allConnectedPlayersAnswered(state)) {
+                revealFlagRound(state);
+            }
+        } else if (state.getGuessSubmissions().size() == state.getPlayers().size()) {
             evaluateGuessGame(state);
             state.setVersion(state.getVersion() + 1);
         }
@@ -501,6 +511,63 @@ public class GameCommandService {
         state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
         state.setGuessTimerEndMillis(System.currentTimeMillis() + (FLAG_ROUND_SECONDS + 2) * 1000L);
         state.setTimerDurationSeconds(FLAG_ROUND_SECONDS);
+        state.setVersion(state.getVersion() + 1);
+
+        final int generation = state.getMinigameGeneration();
+        final int roundIndex = index;
+        String lobbyId = state.getLobbyId();
+        // Force-Timer: tippt nicht jeder, schließt der Timer die Runde.
+        executor.schedule(() -> {
+            if (state.getMinigameGeneration() == generation
+                    && state.getMinigameSubPhase() == MinigameSubPhase.PLAYING
+                    && state.getFlagRoundIndex() == roundIndex) {
+                revealFlagRound(state);
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, FLAG_ROUND_SECONDS + 2L, TimeUnit.SECONDS);
+    }
+
+    private boolean allConnectedPlayersAnswered(GameRoomState state) {
+        long connected = state.getPlayers().stream().filter(PlayerState::isConnected).count();
+        return connected > 0 && state.getGuessSubmissions().size() >= connected;
+    }
+
+    private void revealFlagRound(GameRoomState state) {
+        FlagQuestion round = state.getFlagRounds().get(state.getFlagRoundIndex());
+        state.setFlagCorrectName(round.getCorrectName());      // Auflösung anzeigen
+        state.setMinigameSubPhase(MinigameSubPhase.ROUND_REVEAL);
+        state.setVersion(state.getVersion() + 1);
+
+        final int generation = state.getMinigameGeneration();
+        final int revealedRound = state.getFlagRoundIndex();
+        String lobbyId = state.getLobbyId();
+        executor.schedule(() -> {
+            if (state.getMinigameGeneration() == generation
+                    && state.getMinigameSubPhase() == MinigameSubPhase.ROUND_REVEAL
+                    && state.getFlagRoundIndex() == revealedRound) {
+                advanceFlagRound(state);
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, FLAG_REVEAL_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void advanceFlagRound(GameRoomState state) {
+        int next = state.getFlagRoundIndex() + 1;
+        if (next < state.getFlagRounds().size()) {
+            beginFlagRound(state, next);
+        } else {
+            finishFlagRounds(state);
+        }
+    }
+
+    private void finishFlagRounds(GameRoomState state) {
+        // Endgültige Gewinner-Ermittlung (Score, Tiebreak nach Zeit) folgt in S5.
+        state.setFlagCorrectName(null);
+        state.setMinigameSubPhase(MinigameSubPhase.RESULT);
+        state.setMinigameWinnerPlayerId(state.getCurrentPlayerId());
+        state.setGuessTimerEndMillis(0L);
         state.setVersion(state.getVersion() + 1);
     }
 

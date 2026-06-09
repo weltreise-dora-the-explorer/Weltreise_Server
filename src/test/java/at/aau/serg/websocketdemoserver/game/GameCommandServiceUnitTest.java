@@ -342,6 +342,20 @@ class GameCommandServiceUnitTest {
     }
 
     @Test
+    void flagRoundRevealsWhenOnlyConnectedPlayerAnswers() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        players.get(1).setConnected(false);   // player-2 ist disconnected
+        GameRoomState state = flagGamePlayingRoundZero(service, players);
+
+        service.handleSubmitGuess(state, "player-1", 0);
+
+        // ein disconnecteter Spieler blockiert die Runde nicht
+        assertThat(state.getMinigameSubPhase())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.ROUND_REVEAL);
+    }
+
+    @Test
     void flagSubmitRejectedWhenNotInPlayingSubPhase() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
         GameRoomState state = flagGamePlayingRoundZero(service, defaultPlayers());

@@ -353,6 +353,66 @@ class GameCommandServiceUnitTest {
     }
 
     @Test
+    void flagRoundScoringCountsOnlyCorrectAnswers() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = flagGamePlayingRoundZero(service, defaultPlayers());
+        var round0 = state.getFlagRounds().get(0);
+        int correctIdx = round0.getOptions().indexOf(round0.getCorrectName());
+        int wrongIdx = (correctIdx + 1) % round0.getOptions().size();
+
+        service.handleSubmitGuess(state, "player-1", correctIdx);
+        service.handleSubmitGuess(state, "player-2", wrongIdx);  // löst Reveal aus
+
+        assertThat(state.getFlagScores()).containsEntry("player-1", 1);
+        assertThat(state.getFlagScores().getOrDefault("player-2", 0)).isZero();
+    }
+
+    @Test
+    void flagWinnerIsHighestScorer() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());      // Stadteroberer = player-1
+        state.getFlagScores().put("player-1", 2);
+        state.getFlagScores().put("player-2", 4);
+        state.getFlagTotalTimeMs().put("player-1", 1000L);
+        state.getFlagTotalTimeMs().put("player-2", 9000L);
+
+        assertThat(service.determineFlagWinner(state)).isEqualTo("player-2");
+    }
+
+    @Test
+    void flagWinnerTieBreaksByFasterTime() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.getFlagScores().put("player-1", 3);
+        state.getFlagScores().put("player-2", 3);
+        state.getFlagTotalTimeMs().put("player-1", 5000L);
+        state.getFlagTotalTimeMs().put("player-2", 3000L);
+
+        assertThat(service.determineFlagWinner(state)).isEqualTo("player-2");
+    }
+
+    @Test
+    void flagWinnerTieGoesToConquerorOnEqualTime() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());      // Stadteroberer = player-1
+        state.getFlagScores().put("player-1", 3);
+        state.getFlagScores().put("player-2", 3);
+        state.getFlagTotalTimeMs().put("player-1", 4000L);
+        state.getFlagTotalTimeMs().put("player-2", 4000L);
+
+        assertThat(service.determineFlagWinner(state)).isEqualTo("player-1");
+    }
+
+    @Test
+    void flagWinnerIsConquerorWhenNobodyScored() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());      // Stadteroberer = player-1
+
+        // niemand hat eine richtige Antwort -> alle Score 0
+        assertThat(service.determineFlagWinner(state)).isEqualTo("player-1");
+    }
+
+    @Test
     void startMinigameRejectsWhenNotInMinigamePhase() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
         GameRoomState state = inTurnState(defaultPlayers());

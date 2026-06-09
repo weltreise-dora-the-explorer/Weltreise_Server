@@ -534,6 +534,7 @@ public class GameCommandService {
     }
 
     private void revealFlagRound(GameRoomState state) {
+        scoreFlagRound(state);
         FlagQuestion round = state.getFlagRounds().get(state.getFlagRoundIndex());
         state.setFlagCorrectName(round.getCorrectName());      // Auflösung anzeigen
         state.setMinigameSubPhase(MinigameSubPhase.ROUND_REVEAL);
@@ -563,12 +564,81 @@ public class GameCommandService {
     }
 
     private void finishFlagRounds(GameRoomState state) {
-        // Endgültige Gewinner-Ermittlung (Score, Tiebreak nach Zeit) folgt in S5.
+        state.setMinigameWinnerPlayerId(determineFlagWinner(state));
         state.setFlagCorrectName(null);
         state.setMinigameSubPhase(MinigameSubPhase.RESULT);
-        state.setMinigameWinnerPlayerId(state.getCurrentPlayerId());
         state.setGuessTimerEndMillis(0L);
         state.setVersion(state.getVersion() + 1);
+    }
+
+    /**
+     * Wertet die aktuelle Runde: richtige Antwort -> Punkt + Antwortzeit addieren.
+     * Keine/falsche Antwort zählt nicht (und liefert keine Zeit).
+     */
+    private void scoreFlagRound(GameRoomState state) {
+        FlagQuestion round = state.getFlagRounds().get(state.getFlagRoundIndex());
+        long roundStart = state.getGuessTimerEndMillis() - (FLAG_ROUND_SECONDS + 2) * 1000L;
+
+        for (PlayerState player : state.getPlayers()) {
+            String id = player.getPlayerId();
+            Integer choice = state.getGuessSubmissions().get(id);
+            if (choice == null) continue;
+
+            boolean correct = choice >= 0 && choice < round.getOptions().size()
+                    && round.getOptions().get(choice).equals(round.getCorrectName());
+            if (correct) {
+                state.getFlagScores().merge(id, 1, Integer::sum);
+                Long ts = state.getGuessSubmissionTimestamps().get(id);
+                long elapsed = ts != null ? Math.max(0L, ts - roundStart) : 0L;
+                state.getFlagTotalTimeMs().merge(id, elapsed, Long::sum);
+            }
+        }
+    }
+
+    /**
+     * Gewinner: meiste richtige Antworten; bei Gleichstand kürzere Gesamtzeit;
+     * bei exaktem Gleichstand gewinnt der Stadteroberer (verteidigt).
+     */
+    String determineFlagWinner(GameRoomState state) {
+        int bestScore = -1;
+        long bestTime = Long.MAX_VALUE;
+
+        for (PlayerState player : state.getPlayers()) {
+            int score = flagScoreOf(state, player.getPlayerId());
+            long time = flagTimeOf(state, player.getPlayerId());
+            if (score > bestScore || (score == bestScore && time < bestTime)) {
+                bestScore = score;
+                bestTime = time;
+            }
+        }
+
+        String conqueror = state.getCurrentPlayerId();
+        if (isFlagBest(state, conqueror, bestScore, bestTime)) {
+            return conqueror;
+        }
+        for (PlayerState player : state.getPlayers()) {
+            if (isFlagBest(state, player.getPlayerId(), bestScore, bestTime)) {
+                return player.getPlayerId();
+            }
+        }
+        return conqueror;
+    }
+
+    private boolean isFlagBest(GameRoomState state, String id, int bestScore, long bestTime) {
+        return id != null
+                && flagScoreOf(state, id) == bestScore
+                && flagTimeOf(state, id) == bestTime;
+    }
+
+    private int flagScoreOf(GameRoomState state, String id) {
+        return state.getFlagScores().getOrDefault(id, 0);
+    }
+
+    private long flagTimeOf(GameRoomState state, String id) {
+        // Ohne richtige Antwort zählt die Zeit als "schlechteste" (MAX).
+        return flagScoreOf(state, id) > 0
+                ? state.getFlagTotalTimeMs().getOrDefault(id, Long.MAX_VALUE)
+                : Long.MAX_VALUE;
     }
 
     private void handleFinishMinigame(GameRoomState state, ClientCommand command) {

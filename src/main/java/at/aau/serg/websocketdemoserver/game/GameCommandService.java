@@ -1,5 +1,7 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.minigame.FlagQuestion;
+import at.aau.serg.websocketdemoserver.game.minigame.FlagQuestionPool;
 import at.aau.serg.websocketdemoserver.game.minigame.GuessQuestion;
 import at.aau.serg.websocketdemoserver.game.minigame.GuessQuestionPool;
 import at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase;
@@ -47,6 +49,9 @@ public class GameCommandService {
     private final CityDistributor cityDistributor;
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private final GuessQuestionPool guessQuestionPool = new GuessQuestionPool();
+    private final FlagQuestionPool flagQuestionPool = new FlagQuestionPool();
+    private static final int FLAG_ROUNDS = 5;
+    private static final int FLAG_ROUND_SECONDS = 12;
     private InMemoryLobbyStore lobbyStore;
 
     @Autowired(required = false)
@@ -414,21 +419,29 @@ public class GameCommandService {
         MinigameType[] types = MinigameType.values();
         MinigameType selectedType = types[random.nextInt(types.length)];
 
-        GuessQuestion question = guessQuestionPool.getRandom();
-
         state.getGuessSubmissions().clear();
         state.getGuessSubmissionTimestamps().clear();
 
         state.setMinigameGeneration(state.getMinigameGeneration() + 1);
-        final int generation = state.getMinigameGeneration();
-
         state.setSelectedMinigame(selectedType);
-        state.setGuessQuestionText(question.getQuestionText());
-        state.setGuessQuestionAnswer((int) question.getCorrectAnswer());
         state.setMinigameSubPhase(MinigameSubPhase.SELECTING);
         state.setGuessTimerEndMillis(0L);
-        state.setVersion(state.getVersion() + 1);
 
+        if (selectedType == MinigameType.FLAG_GAME) {
+            startFlagGame(state);
+        } else {
+            startGuessGame(state);
+        }
+
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void startGuessGame(GameRoomState state) {
+        GuessQuestion question = guessQuestionPool.getRandom();
+        state.setGuessQuestionText(question.getQuestionText());
+        state.setGuessQuestionAnswer((int) question.getCorrectAnswer());
+
+        final int generation = state.getMinigameGeneration();
         String lobbyId = state.getLobbyId();
 
         executor.schedule(() -> {
@@ -452,6 +465,43 @@ public class GameCommandService {
                 broadcastState(lobbyId, state);
             }
         }, 36, TimeUnit.SECONDS);
+    }
+
+    private void startFlagGame(GameRoomState state) {
+        state.setFlagRounds(flagQuestionPool.generateRounds(FLAG_ROUNDS));
+        state.setFlagRoundIndex(0);
+        state.getFlagScores().clear();
+        state.getFlagTotalTimeMs().clear();
+        state.setFlagCode(null);
+        state.setFlagOptions(new ArrayList<>());
+        state.setFlagCorrectName(null);
+
+        final int generation = state.getMinigameGeneration();
+        String lobbyId = state.getLobbyId();
+
+        // Nach dem Auslosungs-Intro (SELECTING) die erste Runde starten.
+        executor.schedule(() -> {
+            if (state.getMinigameGeneration() == generation
+                    && state.getMinigameSubPhase() == MinigameSubPhase.SELECTING) {
+                beginFlagRound(state, 0);
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, 6, TimeUnit.SECONDS);
+    }
+
+    private void beginFlagRound(GameRoomState state, int index) {
+        FlagQuestion round = state.getFlagRounds().get(index);
+        state.setFlagRoundIndex(index);
+        state.setFlagCode(round.getFlagCode());
+        state.setFlagOptions(round.getOptions());
+        state.setFlagCorrectName(null);                 // erst in ROUND_REVEAL gesetzt
+        state.getGuessSubmissions().clear();
+        state.getGuessSubmissionTimestamps().clear();
+        state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
+        state.setGuessTimerEndMillis(System.currentTimeMillis() + (FLAG_ROUND_SECONDS + 2) * 1000L);
+        state.setTimerDurationSeconds(FLAG_ROUND_SECONDS);
+        state.setVersion(state.getVersion() + 1);
     }
 
     private void handleFinishMinigame(GameRoomState state, ClientCommand command) {

@@ -217,6 +217,27 @@ class GameCommandServiceUnitTest {
     }
 
     @Test
+    void startMinigameStartsFlagGameWithFiveRounds() {
+        // FixedRandom(1) -> types[1] == FLAG_GAME
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+
+        service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getSelectedMinigame())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameType.FLAG_GAME);
+        assertThat(state.getMinigameSubPhase())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.SELECTING);
+        assertThat(state.getFlagRounds()).hasSize(5);
+        assertThat(state.getFlagScores()).isEmpty();
+        assertThat(state.getFlagRoundIndex()).isZero();
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
     void startMinigameRejectsWhenNotInMinigamePhase() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
         GameRoomState state = inTurnState(defaultPlayers());

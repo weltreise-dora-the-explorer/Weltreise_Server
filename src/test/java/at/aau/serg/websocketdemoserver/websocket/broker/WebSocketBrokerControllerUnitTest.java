@@ -45,6 +45,12 @@ class WebSocketBrokerControllerUnitTest {
         return ha;
     }
 
+    /** Bindet eine Session im Mock-Registry an einen Spieler (für geschützte Commands). */
+    private void registerMockSession(String sessionId, String lobbyId, String playerId) {
+        when(sessionRegistry.get(sessionId))
+                .thenReturn(Optional.of(new SessionRegistry.SessionInfo(lobbyId, playerId)));
+    }
+
     @Test
     void handleLobbyCommandRoutesCreateLobbyAndReturnsSuccessResponse() {
         WebSocketBrokerController controller = createController();
@@ -90,6 +96,7 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandUnregistersSessionOnLeaveLobby() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.LEAVE_LOBBY, null, "player-1", null, null);
+        registerMockSession("session-xyz", "lobby-1", "player-1");
         when(lobbyService.leaveLobby("lobby-1", "player-1")).thenReturn(new LobbyLeaveResult(new GameRoomState(), false));
 
         controller.handleLobbyCommand("lobby-1", command, headerWithSession("session-xyz"));
@@ -164,6 +171,7 @@ class WebSocketBrokerControllerUnitTest {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null, null);
         GameRoomState state = new GameRoomState();
+        registerMockSession("s1", "lobby-1", "player-1");
         when(lobbyStore.get("lobby-1")).thenReturn(Optional.of(state));
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
@@ -179,6 +187,7 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandReturnsErrorResponseOnValidationFailure() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.START_GAME, null, "player-1", null, null);
+        registerMockSession("s1", "lobby-1", "player-1");
         doThrow(new GameException(ErrorCode.MIN_PLAYERS_NOT_REACHED, "At least two players are required"))
                 .when(lobbyService).startGame("lobby-1", 12);
 
@@ -208,6 +217,7 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandReturnsInternalErrorOnUnexpectedException() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.START_GAME, null, "player-1", null, null);
+        registerMockSession("s1", "lobby-1", "player-1");
         doThrow(new RuntimeException("unexpected"))
                 .when(lobbyService).startGame("lobby-1", 12);
 
@@ -249,6 +259,7 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandReturnsErrorWhenLobbyNotFoundForRollDice() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null, null);
+        registerMockSession("s1", "lobby-1", "player-1");
         when(lobbyStore.get("lobby-1")).thenReturn(java.util.Optional.empty());
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
@@ -264,6 +275,7 @@ class WebSocketBrokerControllerUnitTest {
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");
 
+        registerMockSession("s1", "lobby-1", "player-1");
         when(lobbyService.leaveLobby("lobby-1", "player-1")).thenReturn(new LobbyLeaveResult(state, false));
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
@@ -281,6 +293,7 @@ class WebSocketBrokerControllerUnitTest {
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");
 
+        registerMockSession("s1", "lobby-1", "host-player");
         when(lobbyService.leaveLobby("lobby-1", "host-player")).thenReturn(new LobbyLeaveResult(state, true));
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
@@ -354,10 +367,65 @@ class WebSocketBrokerControllerUnitTest {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.LEAVE_LOBBY, null, "player-1", null, null);
 
+        registerMockSession("s1", "lobby-1", "player-1");
         when(lobbyService.leaveLobby("lobby-1", "player-1")).thenReturn(new LobbyLeaveResult(new GameRoomState(), false));
 
         controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
 
         verify(disconnectScheduler).cancel("lobby-1", "player-1");
+    }
+
+    @Test
+    void handleLobbyCommandRejectsProtectedCommandWhenSessionBelongsToAnotherPlayer() {
+        WebSocketBrokerController controller = createController();
+        // Session gehört zu player-2, das Command behauptet aber player-1 zu sein.
+        registerMockSession("s1", "lobby-1", "player-2");
+        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null, null);
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.NOT_AUTHORIZED);
+        verifyNoInteractions(gameCommandService);
+        verifyNoInteractions(lobbyStore);
+    }
+
+    @Test
+    void handleLobbyCommandRejectsProtectedCommandWhenSessionNotRegistered() {
+        WebSocketBrokerController controller = createController();
+        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null, null);
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("unknown-session"));
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.NOT_AUTHORIZED);
+        verifyNoInteractions(gameCommandService);
+    }
+
+    @Test
+    void handleLobbyCommandRejectsProtectedCommandWhenHeaderAccessorIsNull() {
+        WebSocketBrokerController controller = createController();
+        ClientCommand command = new ClientCommand(CommandType.ROLL_DICE, null, "player-1", null, null);
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command, null);
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.NOT_AUTHORIZED);
+        verifyNoInteractions(gameCommandService);
+    }
+
+    @Test
+    void handleLobbyCommandRejectsReportCheatFromForeignSession() {
+        WebSocketBrokerController controller = createController();
+        // player-1 versucht, im Namen von player-2 einen Cheat zu melden.
+        registerMockSession("s1", "lobby-1", "player-1");
+        ClientCommand command = new ClientCommand(CommandType.REPORT_CHEAT, null, "player-2", null, null);
+        command.setReportedPlayerId("player-3");
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.NOT_AUTHORIZED);
+        verifyNoInteractions(gameCommandService);
     }
 }

@@ -25,6 +25,7 @@ class TurnBasedDtosUnitTest {
                 CommandType.MOVE_TO_CITY,
                 CommandType.END_TURN,
                 CommandType.START_MINIGAME,
+                CommandType.SUBMIT_GUESS,
                 CommandType.ANNOUNCE_MINIGAME_RESULT,
                 CommandType.FINISH_MINIGAME,
                 CommandType.REACTION_READY,

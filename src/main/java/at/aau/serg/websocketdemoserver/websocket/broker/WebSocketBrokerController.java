@@ -17,6 +17,9 @@ import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.stereotype.Controller;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 
 /**
  * Controller-Klasse, die eingehende WebSocket-Kommandos entgegennimmt und
@@ -24,6 +27,32 @@ import org.springframework.stereotype.Controller;
  */
 @Controller
 public class WebSocketBrokerController {
+
+    /**
+     * Commands, die im Namen eines bereits angemeldeten Spielers ausgeführt
+     * werden. Sie dürfen nur von der WebSocket-Session abgesetzt werden, die
+     * tatsächlich zu dieser {@code playerId} gehört (siehe {@link #requireAuthorizedSession}).
+     * Ausgenommen sind {@code CREATE_LOBBY}, {@code JOIN_LOBBY} und
+     * {@code REJOIN_LOBBY}, da diese die Session-Identität erst etablieren.
+     */
+    private static final Set<CommandType> PROTECTED_COMMANDS = EnumSet.of(
+            CommandType.UPDATE_GAME_MODE,
+            CommandType.START_GAME,
+            CommandType.RESET_LOBBY,
+            CommandType.ROLL_DICE,
+            CommandType.MOVE_TOKEN,
+            CommandType.MOVE_TO_CITY,
+            CommandType.END_TURN,
+            CommandType.START_MINIGAME,
+            CommandType.SUBMIT_GUESS,
+            CommandType.ANNOUNCE_MINIGAME_RESULT,
+            CommandType.FINISH_MINIGAME,
+            CommandType.USE_FREE_PASS,
+            CommandType.USE_SHAKE_CHEAT,
+            CommandType.REPORT_CHEAT,
+            CommandType.LEAVE_LOBBY
+    );
+
     private final LobbyService lobbyService;
     private final GameCommandService gameCommandService;
     private final InMemoryLobbyStore lobbyStore;
@@ -64,6 +93,10 @@ public class WebSocketBrokerController {
                 throw new GameException(ErrorCode.MISSING_COMMAND_TYPE, "Command type is required");
             }
             command.setLobbyId(lobbyId);
+
+            if (PROTECTED_COMMANDS.contains(commandType)) {
+                requireAuthorizedSession(headerAccessor, lobbyId, command);
+            }
 
             if (commandType == CommandType.LEAVE_LOBBY) {
                 LobbyLeaveResult result = lobbyService.leaveLobby(lobbyId, command.getPlayerId());
@@ -128,6 +161,17 @@ public class WebSocketBrokerController {
                     lobbyStore.save();
                     yield existingState;
                 }
+                case SUBMIT_GUESS -> {
+                    GameRoomState existingState = lobbyStore.get(lobbyId)
+                            .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
+                    Integer guess = command.getGuess();
+                    if (guess == null) {
+                        throw new GameException(ErrorCode.INVALID_COMMAND, "Guess value is required");
+                    }
+                    gameCommandService.handleSubmitGuess(existingState, command.getPlayerId(), guess);
+                    lobbyStore.save();
+                    yield existingState;
+                }
                 default -> throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type");
             };
 
@@ -137,6 +181,28 @@ public class WebSocketBrokerController {
             return new CommandResponse(false, ex.getMessage(), ex.getErrorCode(), lobbyId, commandType, null);
         } catch (Exception ex) {
             return new CommandResponse(false, "Internal server error", ErrorCode.INTERNAL_ERROR, lobbyId, commandType, null);
+        }
+    }
+
+    /**
+     * Stellt sicher, dass der Aufrufer wirklich der Spieler ist, für den er
+     * handeln will. Verglichen wird die {@code playerId} aus dem Command mit
+     * der {@link SessionRegistry.SessionInfo}, die beim Beitreten an die
+     * WebSocket-Session gebunden wurde. So kann Spieler 1 keine Commands im
+     * Namen von Spieler 2 absetzen.
+     */
+    private void requireAuthorizedSession(SimpMessageHeaderAccessor headerAccessor, String lobbyId, ClientCommand command) {
+        String sessionId = headerAccessor != null ? headerAccessor.getSessionId() : null;
+        SessionRegistry.SessionInfo info = sessionId != null
+                ? sessionRegistry.get(sessionId).orElse(null)
+                : null;
+
+        if (info == null
+                || !lobbyId.equals(info.lobbyId())
+                || command.getPlayerId() == null
+                || !command.getPlayerId().equals(info.playerId())) {
+            throw new GameException(ErrorCode.NOT_AUTHORIZED,
+                    "Session is not authorized to act as player '" + command.getPlayerId() + "'");
         }
     }
 

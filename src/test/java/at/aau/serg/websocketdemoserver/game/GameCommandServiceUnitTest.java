@@ -217,6 +217,216 @@ class GameCommandServiceUnitTest {
     }
 
     @Test
+    void startMinigameStartsFlagGameWithFiveRounds() {
+        // FixedRandom(1) -> types[1] == FLAG_GAME
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+
+        service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getSelectedMinigame())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameType.FLAG_GAME);
+        assertThat(state.getMinigameSubPhase())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.SELECTING);
+        assertThat(state.getFlagRounds()).hasSize(5);
+        assertThat(state.getFlagScores()).isEmpty();
+        assertThat(state.getFlagRoundIndex()).isZero();
+        assertThat(state.getVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void startFlagGameResetsStaleStateAndBumpsGeneration() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1)); // FLAG_GAME
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.setPhase(GamePhase.MINIGAME);
+
+        // Reste aus einem früheren Minispiel:
+        state.getFlagScores().put("player-1", 3);
+        state.setFlagRoundIndex(4);
+        state.setFlagCorrectName("Germany");
+        state.setMinigameGeneration(7);
+
+        service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getFlagScores()).isEmpty();
+        assertThat(state.getFlagRoundIndex()).isZero();
+        assertThat(state.getFlagCorrectName()).isNull();              // kein Spicken im Intro
+        assertThat(state.getMinigameGeneration()).isEqualTo(8);
+    }
+
+    @Test
+    void startFlagGameGeneratesFiveDistinctValidFlags() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1)); // FLAG_GAME
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.setPhase(GamePhase.MINIGAME);
+
+        service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getFlagRounds()).hasSize(5);
+        assertThat(state.getFlagRounds().stream()
+                .map(at.aau.serg.websocketdemoserver.game.minigame.FlagQuestion::getFlagCode)
+                .distinct()).hasSize(5);
+        state.getFlagRounds().forEach(question ->
+                assertThat(question.getOptions()).hasSize(4).contains(question.getCorrectName()));
+    }
+
+    /** Startet ein Flaggenspiel und versetzt es synchron in Runde 0 (PLAYING). */
+    private GameRoomState flagGamePlayingRoundZero(GameCommandService service, List<PlayerState> players) {
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+        service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
+
+        var round = state.getFlagRounds().get(0);
+        state.setFlagRoundIndex(0);
+        state.setFlagCode(round.getFlagCode());
+        state.setFlagOptions(round.getOptions());
+        state.setFlagCorrectName(null);
+        state.getGuessSubmissions().clear();
+        state.getGuessSubmissionTimestamps().clear();
+        state.setMinigameSubPhase(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.PLAYING);
+        return state;
+    }
+
+    @Test
+    void flagSubmitStoresOptionIndexDuringPlaying() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = flagGamePlayingRoundZero(service, defaultPlayers());
+
+        service.handleSubmitGuess(state, "player-1", 2);
+
+        assertThat(state.getGuessSubmissions()).containsEntry("player-1", 2);
+        assertThat(state.getGuessSubmissionTimestamps()).containsKey("player-1");
+        // erst 1 von 2 -> bleibt PLAYING
+        assertThat(state.getMinigameSubPhase())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.PLAYING);
+    }
+
+    @Test
+    void flagSubmitRejectsOutOfRangeIndex() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = flagGamePlayingRoundZero(service, defaultPlayers());
+
+        assertThatThrownBy(() -> service.handleSubmitGuess(state, "player-1", 4))
+                .isInstanceOf(GameException.class);
+        assertThatThrownBy(() -> service.handleSubmitGuess(state, "player-1", -1))
+                .isInstanceOf(GameException.class);
+    }
+
+    @Test
+    void flagSubmitIgnoresDoubleSubmit() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = flagGamePlayingRoundZero(service, defaultPlayers());
+
+        service.handleSubmitGuess(state, "player-1", 1);
+        service.handleSubmitGuess(state, "player-1", 3); // wird ignoriert
+
+        assertThat(state.getGuessSubmissions()).containsEntry("player-1", 1);
+        assertThat(state.getGuessSubmissions()).hasSize(1);
+    }
+
+    @Test
+    void flagRoundRevealsWhenAllConnectedPlayersAnswered() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = flagGamePlayingRoundZero(service, defaultPlayers());
+        String correct = state.getFlagRounds().get(0).getCorrectName();
+
+        service.handleSubmitGuess(state, "player-1", 0);
+        service.handleSubmitGuess(state, "player-2", 1);
+
+        assertThat(state.getMinigameSubPhase())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.ROUND_REVEAL);
+        assertThat(state.getFlagCorrectName()).isEqualTo(correct);
+    }
+
+    @Test
+    void flagRoundRevealsWhenOnlyConnectedPlayerAnswers() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        List<PlayerState> players = defaultPlayers();
+        players.get(1).setConnected(false);   // player-2 ist disconnected
+        GameRoomState state = flagGamePlayingRoundZero(service, players);
+
+        service.handleSubmitGuess(state, "player-1", 0);
+
+        // ein disconnecteter Spieler blockiert die Runde nicht
+        assertThat(state.getMinigameSubPhase())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.ROUND_REVEAL);
+    }
+
+    @Test
+    void flagSubmitRejectedWhenNotInPlayingSubPhase() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = flagGamePlayingRoundZero(service, defaultPlayers());
+        state.setMinigameSubPhase(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.ROUND_REVEAL);
+
+        assertThatThrownBy(() -> service.handleSubmitGuess(state, "player-1", 0))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("playing phase");
+    }
+
+    @Test
+    void flagRoundScoringCountsOnlyCorrectAnswers() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = flagGamePlayingRoundZero(service, defaultPlayers());
+        var round0 = state.getFlagRounds().get(0);
+        int correctIdx = round0.getOptions().indexOf(round0.getCorrectName());
+        int wrongIdx = (correctIdx + 1) % round0.getOptions().size();
+
+        service.handleSubmitGuess(state, "player-1", correctIdx);
+        service.handleSubmitGuess(state, "player-2", wrongIdx);  // löst Reveal aus
+
+        assertThat(state.getFlagScores()).containsEntry("player-1", 1);
+        assertThat(state.getFlagScores().getOrDefault("player-2", 0)).isZero();
+    }
+
+    @Test
+    void flagWinnerIsHighestScorer() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());      // Stadteroberer = player-1
+        state.getFlagScores().put("player-1", 2);
+        state.getFlagScores().put("player-2", 4);
+        state.getFlagTotalTimeMs().put("player-1", 1000L);
+        state.getFlagTotalTimeMs().put("player-2", 9000L);
+
+        assertThat(service.determineFlagWinner(state)).isEqualTo("player-2");
+    }
+
+    @Test
+    void flagWinnerTieBreaksByFasterTime() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.getFlagScores().put("player-1", 3);
+        state.getFlagScores().put("player-2", 3);
+        state.getFlagTotalTimeMs().put("player-1", 5000L);
+        state.getFlagTotalTimeMs().put("player-2", 3000L);
+
+        assertThat(service.determineFlagWinner(state)).isEqualTo("player-2");
+    }
+
+    @Test
+    void flagWinnerTieGoesToConquerorOnEqualTime() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());      // Stadteroberer = player-1
+        state.getFlagScores().put("player-1", 3);
+        state.getFlagScores().put("player-2", 3);
+        state.getFlagTotalTimeMs().put("player-1", 4000L);
+        state.getFlagTotalTimeMs().put("player-2", 4000L);
+
+        assertThat(service.determineFlagWinner(state)).isEqualTo("player-1");
+    }
+
+    @Test
+    void flagWinnerIsConquerorWhenNobodyScored() {
+        GameCommandService service = new GameCommandService(new FixedRandom(1));
+        GameRoomState state = inTurnState(defaultPlayers());      // Stadteroberer = player-1
+
+        // niemand hat eine richtige Antwort -> alle Score 0
+        assertThat(service.determineFlagWinner(state)).isEqualTo("player-1");
+    }
+
+    @Test
     void startMinigameRejectsWhenNotInMinigamePhase() {
         GameCommandService service = new GameCommandService(new FixedRandom(1));
         GameRoomState state = inTurnState(defaultPlayers());

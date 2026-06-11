@@ -1,5 +1,7 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.minigame.FlagQuestion;
+import at.aau.serg.websocketdemoserver.game.minigame.FlagQuestionPool;
 import at.aau.serg.websocketdemoserver.game.minigame.GuessQuestion;
 import at.aau.serg.websocketdemoserver.game.minigame.GuessQuestionPool;
 import at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase;
@@ -47,6 +49,10 @@ public class GameCommandService {
     private final CityDistributor cityDistributor;
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private final GuessQuestionPool guessQuestionPool = new GuessQuestionPool();
+    private final FlagQuestionPool flagQuestionPool = new FlagQuestionPool();
+    private static final int FLAG_ROUNDS = 5;
+    private static final int FLAG_ROUND_SECONDS = 12;
+    private static final int FLAG_REVEAL_SECONDS = 3;
     private InMemoryLobbyStore lobbyStore;
 
     @Autowired(required = false)
@@ -205,11 +211,20 @@ public class GameCommandService {
             return;
         }
 
+        boolean flagGame = state.getSelectedMinigame() == MinigameType.FLAG_GAME;
+        if (flagGame && (guess < 0 || guess >= state.getFlagOptions().size())) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Option index out of range");
+        }
+
         state.getGuessSubmissions().put(playerId, guess);
         state.getGuessSubmissionTimestamps().put(playerId, System.currentTimeMillis());
         state.setVersion(state.getVersion() + 1);
 
-        if (state.getGuessSubmissions().size() == state.getPlayers().size()) {
+        if (flagGame) {
+            if (allConnectedPlayersAnswered(state)) {
+                revealFlagRound(state);
+            }
+        } else if (state.getGuessSubmissions().size() == state.getPlayers().size()) {
             evaluateGuessGame(state);
             state.setVersion(state.getVersion() + 1);
         }
@@ -440,24 +455,39 @@ public class GameCommandService {
             return;
         }
 
-        MinigameType[] types = MinigameType.values();
+        MinigameType[] types = {
+                MinigameType.GUESS_GAME,
+                MinigameType.FLAG_GAME,
+                MinigameType.REACTION_GAME
+        };
         MinigameType selectedType = types[random.nextInt(types.length)];
-
-        GuessQuestion question = guessQuestionPool.getRandom();
 
         state.getGuessSubmissions().clear();
         state.getGuessSubmissionTimestamps().clear();
+        resetReactionMinigameState(state);
 
         state.setMinigameGeneration(state.getMinigameGeneration() + 1);
-        final int generation = state.getMinigameGeneration();
-
         state.setSelectedMinigame(selectedType);
-        state.setGuessQuestionText(question.getQuestionText());
-        state.setGuessQuestionAnswer((int) question.getCorrectAnswer());
         state.setMinigameSubPhase(MinigameSubPhase.SELECTING);
         state.setGuessTimerEndMillis(0L);
-        state.setVersion(state.getVersion() + 1);
 
+        if (selectedType == MinigameType.FLAG_GAME) {
+            startFlagGame(state);
+        } else if (selectedType == MinigameType.REACTION_GAME) {
+            resetReactionMinigameState(state);
+        } else {
+            startGuessGame(state);
+        }
+
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void startGuessGame(GameRoomState state) {
+        GuessQuestion question = guessQuestionPool.getRandom();
+        state.setGuessQuestionText(question.getQuestionText());
+        state.setGuessQuestionAnswer((int) question.getCorrectAnswer());
+
+        final int generation = state.getMinigameGeneration();
         String lobbyId = state.getLobbyId();
 
         executor.schedule(() -> {
@@ -483,93 +513,170 @@ public class GameCommandService {
         }, 36, TimeUnit.SECONDS);
     }
 
-    private void handleReactionReady(GameRoomState state, ClientCommand command) {
-        if(state.getPhase() != GamePhase.MINIGAME) {
-            throw new GameException(ErrorCode.INVALID_PHASE, "Reaction ready is only allowed during minigame phase");
+    private void startFlagGame(GameRoomState state) {
+        state.setFlagRounds(flagQuestionPool.generateRounds(FLAG_ROUNDS));
+        state.setFlagRoundIndex(0);
+        state.getFlagScores().clear();
+        state.getFlagTotalTimeMs().clear();
+        state.setFlagCode(null);
+        state.setFlagOptions(new ArrayList<>());
+        state.setFlagCorrectName(null);
+
+        final int generation = state.getMinigameGeneration();
+        String lobbyId = state.getLobbyId();
+
+        // Nach dem Auslosungs-Intro (SELECTING) die erste Runde starten.
+        executor.schedule(() -> {
+            if (state.getMinigameGeneration() == generation
+                    && state.getMinigameSubPhase() == MinigameSubPhase.SELECTING) {
+                beginFlagRound(state, 0);
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, 6, TimeUnit.SECONDS);
+    }
+
+    private void beginFlagRound(GameRoomState state, int index) {
+        FlagQuestion round = state.getFlagRounds().get(index);
+        state.setFlagRoundIndex(index);
+        state.setFlagCode(round.getFlagCode());
+        state.setFlagOptions(round.getOptions());
+        state.setFlagCorrectName(null);                 // erst in ROUND_REVEAL gesetzt
+        state.getGuessSubmissions().clear();
+        state.getGuessSubmissionTimestamps().clear();
+        state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
+        state.setGuessTimerEndMillis(System.currentTimeMillis() + (FLAG_ROUND_SECONDS + 2) * 1000L);
+        state.setTimerDurationSeconds(FLAG_ROUND_SECONDS);
+        state.setVersion(state.getVersion() + 1);
+
+        final int generation = state.getMinigameGeneration();
+        final int roundIndex = index;
+        String lobbyId = state.getLobbyId();
+
+        // Force-Timer: tippt nicht jeder, schließt der Timer die Runde.
+        executor.schedule(() -> {
+            if (state.getMinigameGeneration() == generation
+                    && state.getMinigameSubPhase() == MinigameSubPhase.PLAYING
+                    && state.getFlagRoundIndex() == roundIndex) {
+                revealFlagRound(state);
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, FLAG_ROUND_SECONDS + 2L, TimeUnit.SECONDS);
+    }
+
+    private boolean allConnectedPlayersAnswered(GameRoomState state) {
+        long connected = state.getPlayers().stream().filter(PlayerState::isConnected).count();
+        return connected > 0 && state.getGuessSubmissions().size() >= connected;
+    }
+
+    private void revealFlagRound(GameRoomState state) {
+        scoreFlagRound(state);
+        FlagQuestion round = state.getFlagRounds().get(state.getFlagRoundIndex());
+        state.setFlagCorrectName(round.getCorrectName());      // Auflösung anzeigen
+        state.setMinigameSubPhase(MinigameSubPhase.ROUND_REVEAL);
+        state.setVersion(state.getVersion() + 1);
+
+        final int generation = state.getMinigameGeneration();
+        final int revealedRound = state.getFlagRoundIndex();
+        String lobbyId = state.getLobbyId();
+
+        executor.schedule(() -> {
+            if (state.getMinigameGeneration() == generation
+                    && state.getMinigameSubPhase() == MinigameSubPhase.ROUND_REVEAL
+                    && state.getFlagRoundIndex() == revealedRound) {
+                advanceFlagRound(state);
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, FLAG_REVEAL_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void advanceFlagRound(GameRoomState state) {
+        int next = state.getFlagRoundIndex() + 1;
+        if (next < state.getFlagRounds().size()) {
+            beginFlagRound(state, next);
+        } else {
+            finishFlagRounds(state);
         }
+    }
 
-        findPlayerState(state.getPlayers(), command.getPlayerId());
-
-        if(!state.getReactionReadyPlayerIds().contains(command.getPlayerId())) {
-            state.getReactionReadyPlayerIds().add(command.getPlayerId());
-        }
-
-        boolean allPlayersReady = state.getPlayers().stream()
-                .allMatch(player -> state.getReactionReadyPlayerIds().contains(player.getPlayerId()));
-
-        if(state.getReactionReadyEndsAtMs() == null) {
-            state.setReactionReadyEndsAtMs(System.currentTimeMillis() + 60_000);
-        }
-
-        long now = System.currentTimeMillis();
-        startReactionRoundIfReadyTimedOut(state, now);
-
-        if(allPlayersReady && state.getReactionStartTimeMs() == null) {
-            long countdownStartTimeMs = System.currentTimeMillis();
-            long randomWaitTimeMs = 500 + random.nextInt(4501);
-
-            state.setReactionStartTimeMs(countdownStartTimeMs);
-
-            long buttonVisibleAtMs =
-                    countdownStartTimeMs + 3000 + randomWaitTimeMs;
-
-            state.setReactionButtonVisibleAtMs(buttonVisibleAtMs);
-
-            state.setReactionRoundEndsAtMs(
-                    buttonVisibleAtMs + 60_000
-            );
-        }
-
+    private void finishFlagRounds(GameRoomState state) {
+        state.setMinigameWinnerPlayerId(determineFlagWinner(state));
+        state.setFlagCorrectName(null);
+        state.setMinigameSubPhase(MinigameSubPhase.RESULT);
+        state.setGuessTimerEndMillis(0L);
         state.setVersion(state.getVersion() + 1);
     }
 
-    private void handleReactionPress(GameRoomState state, ClientCommand command) {
-        if(state.getPhase() != GamePhase.MINIGAME) {
-            throw new GameException(ErrorCode.INVALID_PHASE, "Reaction press is only allowed during minigame phase");
+    /**
+     * Wertet die aktuelle Runde: richtige Antwort -> Punkt + Antwortzeit addieren.
+     * Keine/falsche Antwort zählt nicht (und liefert keine Zeit).
+     */
+    private void scoreFlagRound(GameRoomState state) {
+        FlagQuestion round = state.getFlagRounds().get(state.getFlagRoundIndex());
+        long roundStart = state.getGuessTimerEndMillis() - (FLAG_ROUND_SECONDS + 2) * 1000L;
+
+        for (PlayerState player : state.getPlayers()) {
+            String id = player.getPlayerId();
+            Integer choice = state.getGuessSubmissions().get(id);
+            if (choice == null) continue;
+
+            boolean correct = choice >= 0 && choice < round.getOptions().size()
+                    && round.getOptions().get(choice).equals(round.getCorrectName());
+            if (correct) {
+                state.getFlagScores().merge(id, 1, Integer::sum);
+                Long ts = state.getGuessSubmissionTimestamps().get(id);
+                long elapsed = ts != null ? Math.max(0L, ts - roundStart) : 0L;
+                state.getFlagTotalTimeMs().merge(id, elapsed, Long::sum);
+            }
+        }
+    }
+
+    /**
+     * Gewinner: meiste richtige Antworten; bei Gleichstand kürzere Gesamtzeit;
+     * bei exaktem Gleichstand gewinnt der Stadteroberer (verteidigt).
+     */
+    String determineFlagWinner(GameRoomState state) {
+        int bestScore = -1;
+        long bestTime = Long.MAX_VALUE;
+
+        for (PlayerState player : state.getPlayers()) {
+            int score = flagScoreOf(state, player.getPlayerId());
+            long time = flagTimeOf(state, player.getPlayerId());
+            if (score > bestScore || (score == bestScore && time < bestTime)) {
+                bestScore = score;
+                bestTime = time;
+            }
         }
 
-        findPlayerState(state.getPlayers(), command.getPlayerId());
-
-        if(state.getReactionButtonVisibleAtMs() == null) {
-            throw new GameException(ErrorCode.INVALID_COMMAND, "Reaction button is not available yet");
+        String conqueror = state.getCurrentPlayerId();
+        if (isFlagBest(state, conqueror, bestScore, bestTime)) {
+            return conqueror;
         }
-
-        long now = System.currentTimeMillis();
-
-        finishReactionRoundIfTimedOut(state, now);
-
-        if(state.getMinigameWinnerPlayerId() != null) {
-            state.setVersion(state.getVersion() + 1);
-            return;
+        for (PlayerState player : state.getPlayers()) {
+            if (isFlagBest(state, player.getPlayerId(), bestScore, bestTime)) {
+                return player.getPlayerId();
+            }
         }
+        return conqueror;
+    }
 
-        long visibleAtMs = state.getReactionButtonVisibleAtMs();
-        long earlyToleranceMs = 300L;
+    private boolean isFlagBest(GameRoomState state, String id, int bestScore, long bestTime) {
+        return id != null
+                && flagScoreOf(state, id) == bestScore
+                && flagTimeOf(state, id) == bestTime;
+    }
 
-        if (now + earlyToleranceMs < visibleAtMs) {
-            throw new GameException(ErrorCode.INVALID_COMMAND, "Reaction button was pressed too early");
-        }
+    private int flagScoreOf(GameRoomState state, String id) {
+        return state.getFlagScores().getOrDefault(id, 0);
+    }
 
-        if (state.getReactionPressTimesMs().containsKey(command.getPlayerId())) {
-            return;
-        }
-
-        long reactionTimeMs = Math.max(0L, now - visibleAtMs);
-        state.getReactionPressTimesMs().put(command.getPlayerId(), reactionTimeMs);
-
-        boolean allPlayersPressed = state.getPlayers().stream()
-                .allMatch(player -> state.getReactionPressTimesMs().containsKey(player.getPlayerId()));
-
-        if(allPlayersPressed) {
-            String winnerPlayerId = state.getReactionPressTimesMs().entrySet().stream()
-                    .min(java.util.Map.Entry.comparingByValue())
-                    .map(java.util.Map.Entry::getKey)
-                    .orElse(command.getPlayerId());
-
-            state.setMinigameWinnerPlayerId(winnerPlayerId);
-        }
-
-        state.setVersion(state.getVersion() + 1);
+    private long flagTimeOf(GameRoomState state, String id) {
+        // Ohne richtige Antwort zählt die Zeit als "schlechteste" (MAX).
+        return flagScoreOf(state, id) > 0
+                ? state.getFlagTotalTimeMs().getOrDefault(id, Long.MAX_VALUE)
+                : Long.MAX_VALUE;
     }
 
     private void handleFinishMinigame(GameRoomState state, ClientCommand command) {
@@ -877,6 +984,95 @@ public class GameCommandService {
     private boolean isCityAssignedToAnyPlayer(List<PlayerState> players, String cityId) {
         return players.stream()
                 .anyMatch(player -> containsCityById(player.getOwnedCities(), cityId));
+    }
+
+    private void handleReactionReady(GameRoomState state, ClientCommand command) {
+        if(state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Reaction ready is only allowed during minigame phase");
+        }
+
+        findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(!state.getReactionReadyPlayerIds().contains(command.getPlayerId())) {
+            state.getReactionReadyPlayerIds().add(command.getPlayerId());
+        }
+
+        boolean allPlayersReady = state.getPlayers().stream()
+                .allMatch(player -> state.getReactionReadyPlayerIds().contains(player.getPlayerId()));
+
+        if(state.getReactionReadyEndsAtMs() == null) {
+            state.setReactionReadyEndsAtMs(System.currentTimeMillis() + 60_000);
+        }
+
+        long now = System.currentTimeMillis();
+        startReactionRoundIfReadyTimedOut(state, now);
+
+        if(allPlayersReady && state.getReactionStartTimeMs() == null) {
+            long countdownStartTimeMs = System.currentTimeMillis();
+            long randomWaitTimeMs = 500 + random.nextInt(4501);
+
+            state.setReactionStartTimeMs(countdownStartTimeMs);
+
+            long buttonVisibleAtMs =
+                    countdownStartTimeMs + 3000 + randomWaitTimeMs;
+
+            state.setReactionButtonVisibleAtMs(buttonVisibleAtMs);
+
+            state.setReactionRoundEndsAtMs(
+                    buttonVisibleAtMs + 60_000
+            );
+        }
+
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleReactionPress(GameRoomState state, ClientCommand command) {
+        if(state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Reaction press is only allowed during minigame phase");
+        }
+
+        findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(state.getReactionButtonVisibleAtMs() == null) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Reaction button is not available yet");
+        }
+
+        long now = System.currentTimeMillis();
+
+        finishReactionRoundIfTimedOut(state, now);
+
+        if(state.getMinigameWinnerPlayerId() != null) {
+            state.setVersion(state.getVersion() + 1);
+            return;
+        }
+
+        long visibleAtMs = state.getReactionButtonVisibleAtMs();
+        long earlyToleranceMs = 300L;
+
+        if (now + earlyToleranceMs < visibleAtMs) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Reaction button was pressed too early");
+        }
+
+        if (state.getReactionPressTimesMs().containsKey(command.getPlayerId())) {
+            return;
+        }
+
+        long reactionTimeMs = Math.max(0L, now - visibleAtMs);
+        state.getReactionPressTimesMs().put(command.getPlayerId(), reactionTimeMs);
+
+        boolean allPlayersPressed = state.getPlayers().stream()
+                .allMatch(player -> state.getReactionPressTimesMs().containsKey(player.getPlayerId()));
+
+        if(allPlayersPressed) {
+            String winnerPlayerId = state.getReactionPressTimesMs().entrySet().stream()
+                    .min(java.util.Map.Entry.comparingByValue())
+                    .map(java.util.Map.Entry::getKey)
+                    .orElse(command.getPlayerId());
+
+            state.setMinigameWinnerPlayerId(winnerPlayerId);
+        }
+
+        state.setVersion(state.getVersion() + 1);
     }
 
     private void resetReactionMinigameState(GameRoomState state) {

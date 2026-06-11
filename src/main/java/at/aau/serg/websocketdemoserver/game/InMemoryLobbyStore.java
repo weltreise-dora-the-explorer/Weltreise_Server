@@ -1,10 +1,13 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.minigame.MinigameType;
+import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,7 +34,46 @@ public class InMemoryLobbyStore {
     void loadFromPersistence() {
         if (persistence != null) {
             lobbies.putAll(persistence.loadAll());
+            recoverInterruptedFlagMinigames();
         }
+    }
+
+    /**
+     * Nach einem Server-Neustart ist der Antwort-Schlüssel eines Flaggenspiels weg
+     * ({@code @JsonIgnore}) und es laufen keine Timer mehr. Solche unterbrochenen
+     * Flaggenspiele werden sauber beendet: zurück auf {@code IN_TURN}, sodass der
+     * Stadteroberer das Minispiel erneut starten kann.
+     */
+    void recoverInterruptedFlagMinigames() {
+        for (GameRoomState state : lobbies.values()) {
+            if (isInterruptedFlagMinigame(state)) {
+                resetMinigame(state);
+            }
+        }
+    }
+
+    private static boolean isInterruptedFlagMinigame(GameRoomState state) {
+        return state.getPhase() == GamePhase.MINIGAME
+                && state.getSelectedMinigame() == MinigameType.FLAG_GAME
+                && (state.getFlagRounds() == null || state.getFlagRounds().isEmpty());
+    }
+
+    private static void resetMinigame(GameRoomState state) {
+        state.setPhase(GamePhase.IN_TURN);
+        state.setMinigameSubPhase(null);
+        state.setSelectedMinigame(null);
+        state.setMinigameWinnerPlayerId(null);
+        state.setFlagCode(null);
+        state.setFlagOptions(new ArrayList<>());
+        state.setFlagCorrectName(null);
+        state.setFlagRoundIndex(0);
+        state.getFlagScores().clear();
+        state.getFlagTotalTimeMs().clear();
+        state.getGuessSubmissions().clear();
+        state.getGuessSubmissionTimestamps().clear();
+        state.setGuessTimerEndMillis(0L);
+        state.setTimerDurationSeconds(null);
+        state.setVersion(state.getVersion() + 1);
     }
 
     public GameRoomState getOrCreate(String lobbyId) {

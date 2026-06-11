@@ -239,7 +239,7 @@ on `/topic/rcv-object`.
 
 ## 6. Command Types
 
-`CommandType` enum (`messaging/dtos/CommandType.java`) has 20 values.
+`CommandType` enum (`messaging/dtos/CommandType.java`) has 21 values.
 They are split into two groups:
 
 * **Client requests** — sent via `/app/lobby/{lobbyId}/command`.
@@ -311,6 +311,7 @@ sender (`playerId`) is, so you can still report another player.
 | `MOVE_TO_CITY` | client → server | current turn player | `playerId`, `targetCityId` | `MOVE_TO_CITY` |
 | `END_TURN` | client → server | current turn player | `playerId` | `END_TURN` |
 | `START_MINIGAME` | client → server | current turn player (on an open target city) | `playerId` | `START_MINIGAME` |
+| `SUBMIT_GUESS` | client → server | any player in the lobby (during the `PLAYING` sub-phase) | `playerId`, `guess` | `SUBMIT_GUESS` |
 | `ANNOUNCE_MINIGAME_RESULT` | client → server | current turn player | `playerId`, `winnerPlayerId` (opt., default self) | `ANNOUNCE_MINIGAME_RESULT` |
 | `FINISH_MINIGAME` | client → server | current turn player | `playerId`, `winnerPlayerId` (opt.) | `FINISH_MINIGAME` |
 | `USE_FREE_PASS` | client → server | current turn player (with `freePassCount > 0`) | `playerId` | `USE_FREE_PASS` |
@@ -324,7 +325,7 @@ sender (`playerId`) is, so you can still report another player.
 > **Protected commands** (require session authorization, see above):
 > `UPDATE_GAME_MODE`, `START_GAME`, `RESET_LOBBY`, `LEAVE_LOBBY`,
 > `ROLL_DICE`, `MOVE_TOKEN`, `MOVE_TO_CITY`, `END_TURN`, `START_MINIGAME`,
-> `ANNOUNCE_MINIGAME_RESULT`, `FINISH_MINIGAME`, `USE_FREE_PASS`,
+> `SUBMIT_GUESS`, `ANNOUNCE_MINIGAME_RESULT`, `FINISH_MINIGAME`, `USE_FREE_PASS`,
 > `USE_SHAKE_CHEAT`, `REPORT_CHEAT`. Exempt: `CREATE_LOBBY`, `JOIN_LOBBY`,
 > `REJOIN_LOBBY`.
 
@@ -480,10 +481,50 @@ Hands control to the next player. Errors: `NOT_YOUR_TURN`,
 ```
 
 Starts the minigame for the current player's target city (the "city
-conqueror" vs. the rest of the players). Sets `phase` to `MINIGAME`. Only
-valid when the current city is an own, not-yet-completed target city.
-Errors: `NOT_YOUR_TURN`, `CITY_NOT_FOUND`, `INVALID_COMMAND` (not a target
-/ already completed), `NOT_AUTHORIZED`.
+conqueror" vs. the rest of the players). Sets `phase` to `MINIGAME`. The
+server randomly draws a `selectedMinigame` (`GUESS_GAME` or `FLAG_GAME`)
+and runs it through the sub-phases below. Only valid when the current city
+is an own, not-yet-completed target city. Errors: `NOT_YOUR_TURN`,
+`CITY_NOT_FOUND`, `INVALID_COMMAND` (not a target / already completed),
+`NOT_AUTHORIZED`.
+
+#### SUBMIT_GUESS
+
+```json
+// request (GUESS_GAME: numeric estimate)
+{ "type": "SUBMIT_GUESS", "playerId": "Anna", "guess": 14 }
+
+// request (FLAG_GAME: chosen option index 0–3)
+{ "type": "SUBMIT_GUESS", "playerId": "Anna", "guess": 2 }
+```
+
+Submits the player's answer for the current minigame round. Only allowed
+during the `PLAYING` sub-phase; a second submit in the same round is
+ignored. For `FLAG_GAME` the `guess` is the **option index** and must be
+within range. Errors: `INVALID_PHASE` (not playing), `INVALID_COMMAND`
+(flag option index out of range / missing guess), `PLAYER_NOT_IN_LOBBY`,
+`NOT_AUTHORIZED`.
+
+##### Minigame sub-phases & flow
+
+`selectedMinigame` (`MinigameType`): `GUESS_GAME` | `FLAG_GAME`.
+`minigameSubPhase` (`MinigameSubPhase`): `SELECTING` | `PLAYING` |
+`ROUND_REVEAL` | `RESULT`. All clients sync the countdown via
+`guessTimerEndMillis` + `timerDurationSeconds`.
+
+- **GUESS_GAME** — `SELECTING` (≈6 s intro) → `PLAYING` (one numeric
+  question, 30 s) → `RESULT`. Winner = closest guess.
+- **FLAG_GAME** — `SELECTING` (≈6 s) → **5 rounds** of `PLAYING` (12 s,
+  flag shown via `flagCode`, 4 `flagOptions`) → `ROUND_REVEAL` (3 s, the
+  correct answer appears in `flagCorrectName`) → next round → `RESULT`.
+  A round closes when all **connected** players answered or the timer
+  expires. Winner = most correct (`flagScores`); ties broken by lower
+  total answer time (`flagTotalTimeMs`); a remaining tie goes to the
+  conqueror. The correct answer is **not** broadcast during `PLAYING`
+  (no peeking) — `flagCorrectName` is only set in `ROUND_REVEAL`.
+
+In both cases the conqueror finally sends `FINISH_MINIGAME` (winner taken
+from `minigameWinnerPlayerId`) to apply the city / free-pass outcome.
 
 #### ANNOUNCE_MINIGAME_RESULT
 
@@ -692,11 +733,31 @@ that lives at the root of every successful `CommandResponse.state`:
   "validMoveIds":    [ "quito", "dakar" ],      // city ids the current player may move to
   "gameMode":        "CITY_HOPPER",             // GameMode (see §8.3)
   "gameOver":        false,                     // true after the last goal is reached
-  "minigameWinnerPlayerId": null,               // announced winner during MINIGAME phase, else null
+  "minigameWinnerPlayerId": null,               // winner during/after the MINIGAME phase, else null
   "minigameLostCityName":   null,               // last city the conqueror lost (for UI), else null
-  "minigameNewCityName":    null                // replacement city after a lost minigame, else null
+  "minigameNewCityName":    null,               // replacement city after a lost minigame, else null
+
+  // --- minigame engine (only meaningful while phase == MINIGAME) ---
+  "selectedMinigame":   null,                   // MinigameType: GUESS_GAME | FLAG_GAME
+  "minigameSubPhase":   null,                   // SELECTING | PLAYING | ROUND_REVEAL | RESULT
+  "guessTimerEndMillis":0,                      // epoch millis the current timer ends (countdown sync)
+  "timerDurationSeconds": null,                 // shown countdown length (30 guess / 12 flag)
+  "guessSubmissions":   { },                    // playerId -> answer (number, or flag option index 0–3)
+  // GUESS_GAME:
+  "guessQuestionText":  null,                   // the question; numeric answer only sent at RESULT
+  "guessQuestionAnswer":null,
+  // FLAG_GAME:
+  "flagRoundIndex":     0,                      // 0..4
+  "flagCode":           null,                   // ISO code of the shown flag (asset flags/<code>.png)
+  "flagOptions":        [ ],                    // 4 country names (1 correct, shuffled)
+  "flagCorrectName":    null,                   // set ONLY during ROUND_REVEAL (no peeking before)
+  "flagScores":         { },                    // playerId -> correct-answer count
+  "flagTotalTimeMs":    { }                     // playerId -> summed answer time (tie-break)
 }
 ```
+
+> The flag answer key (`flagRounds`) is server-side only (`@JsonIgnore`) and
+> never appears in the broadcast or the persisted `lobbies.json`.
 
 The `version` counter is bumped by every `LobbyService` and
 `GameCommandService` method that mutates state and is intended for clients

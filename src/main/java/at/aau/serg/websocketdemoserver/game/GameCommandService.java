@@ -169,6 +169,16 @@ public class GameCommandService {
             return;
         }
 
+        if(command.getType() == CommandType.REACTION_READY){
+            handleReactionReady(state, command);
+            return;
+        }
+
+        if(command.getType() == CommandType.REACTION_PRESS){
+            handleReactionPress(state, command);
+            return;
+        }
+
         if(command.getType() == CommandType.USE_FREE_PASS){
             handleUseFreePass(state, command);
             return;
@@ -368,6 +378,8 @@ public class GameCommandService {
             state.setValidMoveIds(new ArrayList<>());
 
             if (player.getFreePassCount() <= 0) {
+                resetReactionMinigameState(state);
+                state.setReactionReadyEndsAtMs(System.currentTimeMillis() + 60_000);
                 state.setPhase(GamePhase.MINIGAME);
             }
 
@@ -416,7 +428,7 @@ public class GameCommandService {
     }
 
     private void handleStartMinigame(GameRoomState state, ClientCommand command) {
-        if (state.getPhase() != GamePhase.MINIGAME) {
+        if (state.getPhase() != GamePhase.IN_TURN && state.getPhase() != GamePhase.MINIGAME) {
             throw new GameException(ErrorCode.INVALID_PHASE, "Command not allowed in current phase");
         }
         if (state.getCurrentPlayerId() == null) {
@@ -426,11 +438,33 @@ public class GameCommandService {
             throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
         }
 
-        MinigameType[] types = MinigameType.values();
+        if (state.getPhase() == GamePhase.IN_TURN) {
+            PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
+
+            if (player.getCurrentCity() == null) {
+                throw new GameException(ErrorCode.CITY_NOT_FOUND, "Player has no current city");
+            }
+
+            if (!isCurrentCityOpenTarget(player)) {
+                throw new GameException(ErrorCode.INVALID_PHASE, "Command not allowed in current phase");
+            }
+
+            resetReactionMinigameState(state);
+            state.setPhase(GamePhase.MINIGAME);
+            state.setVersion(state.getVersion() + 1);
+            return;
+        }
+
+        MinigameType[] types = {
+                MinigameType.GUESS_GAME,
+                MinigameType.FLAG_GAME,
+                MinigameType.REACTION_GAME
+        };
         MinigameType selectedType = types[random.nextInt(types.length)];
 
         state.getGuessSubmissions().clear();
         state.getGuessSubmissionTimestamps().clear();
+        resetReactionMinigameState(state);
 
         state.setMinigameGeneration(state.getMinigameGeneration() + 1);
         state.setSelectedMinigame(selectedType);
@@ -439,6 +473,8 @@ public class GameCommandService {
 
         if (selectedType == MinigameType.FLAG_GAME) {
             startFlagGame(state);
+        } else if (selectedType == MinigameType.REACTION_GAME) {
+            startReactionGame(state);
         } else {
             startGuessGame(state);
         }
@@ -475,6 +511,24 @@ public class GameCommandService {
                 broadcastState(lobbyId, state);
             }
         }, 36, TimeUnit.SECONDS);
+    }
+
+    private void startReactionGame(GameRoomState state) {
+        final int generation = state.getMinigameGeneration();
+        String lobbyId = state.getLobbyId();
+
+        executor.schedule(() -> {
+            if (state.getMinigameGeneration() == generation
+                    && state.getSelectedMinigame() == MinigameType.REACTION_GAME
+                    && state.getMinigameSubPhase() == MinigameSubPhase.SELECTING) {
+
+                state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
+                state.setVersion(state.getVersion() + 1);
+
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, 6, TimeUnit.SECONDS);
     }
 
     private void startFlagGame(GameRoomState state) {
@@ -516,6 +570,7 @@ public class GameCommandService {
         final int generation = state.getMinigameGeneration();
         final int roundIndex = index;
         String lobbyId = state.getLobbyId();
+
         // Force-Timer: tippt nicht jeder, schließt der Timer die Runde.
         executor.schedule(() -> {
             if (state.getMinigameGeneration() == generation
@@ -543,6 +598,7 @@ public class GameCommandService {
         final int generation = state.getMinigameGeneration();
         final int revealedRound = state.getFlagRoundIndex();
         String lobbyId = state.getLobbyId();
+
         executor.schedule(() -> {
             if (state.getMinigameGeneration() == generation
                     && state.getMinigameSubPhase() == MinigameSubPhase.ROUND_REVEAL
@@ -946,6 +1002,153 @@ public class GameCommandService {
     private boolean isCityAssignedToAnyPlayer(List<PlayerState> players, String cityId) {
         return players.stream()
                 .anyMatch(player -> containsCityById(player.getOwnedCities(), cityId));
+    }
+
+    private void handleReactionReady(GameRoomState state, ClientCommand command) {
+        if(state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Reaction ready is only allowed during minigame phase");
+        }
+
+        findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(!state.getReactionReadyPlayerIds().contains(command.getPlayerId())) {
+            state.getReactionReadyPlayerIds().add(command.getPlayerId());
+        }
+
+        boolean allPlayersReady = state.getPlayers().stream()
+                .allMatch(player -> state.getReactionReadyPlayerIds().contains(player.getPlayerId()));
+
+        if(state.getReactionReadyEndsAtMs() == null) {
+            state.setReactionReadyEndsAtMs(System.currentTimeMillis() + 60_000);
+        }
+
+        long now = System.currentTimeMillis();
+        startReactionRoundIfReadyTimedOut(state, now);
+
+        if(allPlayersReady && state.getReactionStartTimeMs() == null) {
+            long countdownStartTimeMs = System.currentTimeMillis();
+            long randomWaitTimeMs = 500 + random.nextInt(4501);
+
+            state.setReactionStartTimeMs(countdownStartTimeMs);
+
+            long buttonVisibleAtMs =
+                    countdownStartTimeMs + 3000 + randomWaitTimeMs;
+
+            state.setReactionButtonVisibleAtMs(buttonVisibleAtMs);
+
+            state.setReactionRoundEndsAtMs(
+                    buttonVisibleAtMs + 60_000
+            );
+        }
+
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void handleReactionPress(GameRoomState state, ClientCommand command) {
+        if(state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Reaction press is only allowed during minigame phase");
+        }
+
+        findPlayerState(state.getPlayers(), command.getPlayerId());
+
+        if(state.getReactionButtonVisibleAtMs() == null) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Reaction button is not available yet");
+        }
+
+        long now = System.currentTimeMillis();
+
+        finishReactionRoundIfTimedOut(state, now);
+
+        if(state.getMinigameWinnerPlayerId() != null) {
+            state.setVersion(state.getVersion() + 1);
+            return;
+        }
+
+        long visibleAtMs = state.getReactionButtonVisibleAtMs();
+        long earlyToleranceMs = 300L;
+
+        if (now + earlyToleranceMs < visibleAtMs) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Reaction button was pressed too early");
+        }
+
+        if (state.getReactionPressTimesMs().containsKey(command.getPlayerId())) {
+            return;
+        }
+
+        long reactionTimeMs = Math.max(0L, now - visibleAtMs);
+        state.getReactionPressTimesMs().put(command.getPlayerId(), reactionTimeMs);
+
+        boolean allPlayersPressed = state.getPlayers().stream()
+                .allMatch(player -> state.getReactionPressTimesMs().containsKey(player.getPlayerId()));
+
+        if(allPlayersPressed) {
+            String winnerPlayerId = state.getReactionPressTimesMs().entrySet().stream()
+                    .min(java.util.Map.Entry.comparingByValue())
+                    .map(java.util.Map.Entry::getKey)
+                    .orElse(command.getPlayerId());
+
+            state.setMinigameWinnerPlayerId(winnerPlayerId);
+        }
+
+        state.setVersion(state.getVersion() + 1);
+    }
+
+    private void resetReactionMinigameState(GameRoomState state) {
+        state.getReactionReadyPlayerIds().clear();
+        state.setReactionReadyEndsAtMs(null);
+        state.setReactionStartTimeMs(null);
+        state.setReactionButtonVisibleAtMs(null);
+        state.setReactionRoundEndsAtMs(null);
+        state.getReactionPressTimesMs().clear();
+        state.setMinigameWinnerPlayerId(null);
+    }
+
+    private void finishReactionRoundIfTimedOut(GameRoomState state, long now) {
+        if(state.getReactionRoundEndsAtMs() == null) {
+            return;
+        }
+
+        if(now < state.getReactionRoundEndsAtMs()) {
+            return;
+        }
+
+        for(PlayerState player : state.getPlayers()) {
+            state.getReactionPressTimesMs().putIfAbsent(
+                    player.getPlayerId(),
+                    60_000L
+            );
+        }
+
+        if(state.getMinigameWinnerPlayerId() == null) {
+            String winnerPlayerId = state.getReactionPressTimesMs().entrySet().stream()
+                    .min(java.util.Map.Entry.comparingByValue())
+                    .map(java.util.Map.Entry::getKey)
+                    .orElse(state.getCurrentPlayerId());
+
+            state.setMinigameWinnerPlayerId(winnerPlayerId);
+        }
+    }
+
+    private void startReactionRoundIfReadyTimedOut(GameRoomState state, long now) {
+        if(state.getReactionReadyEndsAtMs() == null) {
+            return;
+        }
+
+        if(state.getReactionStartTimeMs() != null) {
+            return;
+        }
+
+        if(now < state.getReactionReadyEndsAtMs()) {
+            return;
+        }
+
+        long randomWaitTimeMs = 500 + random.nextInt(4501);
+
+        state.setReactionStartTimeMs(now);
+
+        long buttonVisibleAtMs = now + 3000 + randomWaitTimeMs;
+        state.setReactionButtonVisibleAtMs(buttonVisibleAtMs);
+        state.setReactionRoundEndsAtMs(buttonVisibleAtMs + 60_000);
     }
 
     private void recomputeValidMoveIds(GameRoomState state) {

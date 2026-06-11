@@ -30,6 +30,7 @@ public class GameRoomState {
     private String currentPlayerId;
     private Integer lastDiceValue;
     private long version = 0L;
+    private Long serverNowMs;
     private List<String> validMoveIds = new ArrayList<>();
 
     private GameMode gameMode = GameMode.CITY_HOPPER;
@@ -48,6 +49,13 @@ public class GameRoomState {
     private Integer timerDurationSeconds;
     private int minigameGeneration = 0;
 
+    private List<String> reactionReadyPlayerIds = new ArrayList<>();
+    private Long reactionReadyEndsAtMs;
+    private Long reactionRoundEndsAtMs;
+    private Long reactionStartTimeMs;
+    private Long reactionButtonVisibleAtMs;
+    private Map<String, Long> reactionPressTimesMs = new HashMap<>();
+
     // Flaggenspiel (FLAG_GAME) – pro Runde gebroadcastet
     private int flagRoundIndex = 0;
     private String flagCode;
@@ -63,8 +71,10 @@ public class GameRoomState {
     public GameRoomState(String lobbyId, String hostId, List<PlayerState> players,
                          GamePhase phase, String currentPlayerId, Integer lastDiceValue, long version) {
         this(lobbyId, hostId, players, phase, currentPlayerId, lastDiceValue, version,
+                null,
                 new ArrayList<>(), GameMode.CITY_HOPPER, false, null, null, null,
                 null, null, null, null, 0L, new HashMap<>(), new HashMap<>(), null, 0,
+                new ArrayList<>(), null, null, null, null, new HashMap<>(),
                 0, null, new ArrayList<>(), null, new HashMap<>(), new HashMap<>(), new ArrayList<>());
     }
 }

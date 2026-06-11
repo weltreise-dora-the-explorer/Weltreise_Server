@@ -103,6 +103,11 @@ public class WebSocketBrokerController {
                 unregisterSession(headerAccessor);
                 disconnectScheduler.cancel(lobbyId, command.getPlayerId());
                 CommandType responseType = result.lobbyClosed() ? CommandType.LOBBY_CLOSED : CommandType.LEAVE_LOBBY;
+
+                if (result.state() != null) {
+                    result.state().setServerNowMs(System.currentTimeMillis());
+                }
+
                 return new CommandResponse(true, "OK", null, lobbyId, responseType, result.state());
             }
 
@@ -110,6 +115,9 @@ public class WebSocketBrokerController {
                 GameRoomState state = lobbyService.rejoinLobby(lobbyId, command.getPlayerId(), command.getClientId());
                 disconnectScheduler.cancel(lobbyId, command.getPlayerId());
                 registerSession(headerAccessor, lobbyId, command.getPlayerId());
+
+                state.setServerNowMs(System.currentTimeMillis());
+
                 return new CommandResponse(true, "OK", null, lobbyId, CommandType.PLAYER_RECONNECTED, state);
             }
 
@@ -146,7 +154,7 @@ public class WebSocketBrokerController {
                 }
                 case RESET_LOBBY -> lobbyService.resetLobby(command.getLobbyId(), command.getPlayerId());
 
-                case ROLL_DICE, MOVE_TOKEN, MOVE_TO_CITY, END_TURN, START_MINIGAME, ANNOUNCE_MINIGAME_RESULT, FINISH_MINIGAME, USE_FREE_PASS, USE_SHAKE_CHEAT, REPORT_CHEAT -> {
+                case ROLL_DICE, MOVE_TOKEN, MOVE_TO_CITY, END_TURN, START_MINIGAME, ANNOUNCE_MINIGAME_RESULT, FINISH_MINIGAME, REACTION_READY, REACTION_PRESS, USE_FREE_PASS, USE_SHAKE_CHEAT, REPORT_CHEAT -> {
                     GameRoomState existingState = lobbyStore.get(lobbyId)
                             .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
                     gameCommandService.processCommand(existingState, command);
@@ -167,6 +175,7 @@ public class WebSocketBrokerController {
                 default -> throw new GameException(ErrorCode.UNSUPPORTED_COMMAND_TYPE, "Unsupported command type");
             };
 
+            state.setServerNowMs(System.currentTimeMillis());
             return new CommandResponse(true, "OK", null, lobbyId, commandType, state);
         } catch (GameException ex) {
             return new CommandResponse(false, ex.getMessage(), ex.getErrorCode(), lobbyId, commandType, null);

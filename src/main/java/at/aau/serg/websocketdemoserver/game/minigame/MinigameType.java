@@ -2,5 +2,6 @@ package at.aau.serg.websocketdemoserver.game.minigame;
 
 public enum MinigameType {
     GUESS_GAME,
+    REACTION_GAME,
     FLAG_GAME
 }

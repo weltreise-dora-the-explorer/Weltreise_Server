@@ -28,6 +28,8 @@ class TurnBasedDtosUnitTest {
                 CommandType.SUBMIT_GUESS,
                 CommandType.ANNOUNCE_MINIGAME_RESULT,
                 CommandType.FINISH_MINIGAME,
+                CommandType.REACTION_READY,
+                CommandType.REACTION_PRESS,
                 CommandType.USE_FREE_PASS,
                 CommandType.USE_SHAKE_CHEAT,
                 CommandType.REPORT_CHEAT,

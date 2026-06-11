@@ -474,7 +474,7 @@ public class GameCommandService {
         if (selectedType == MinigameType.FLAG_GAME) {
             startFlagGame(state);
         } else if (selectedType == MinigameType.REACTION_GAME) {
-            resetReactionMinigameState(state);
+            startReactionGame(state);
         } else {
             startGuessGame(state);
         }
@@ -511,6 +511,24 @@ public class GameCommandService {
                 broadcastState(lobbyId, state);
             }
         }, 36, TimeUnit.SECONDS);
+    }
+
+    private void startReactionGame(GameRoomState state) {
+        final int generation = state.getMinigameGeneration();
+        String lobbyId = state.getLobbyId();
+
+        executor.schedule(() -> {
+            if (state.getMinigameGeneration() == generation
+                    && state.getSelectedMinigame() == MinigameType.REACTION_GAME
+                    && state.getMinigameSubPhase() == MinigameSubPhase.SELECTING) {
+
+                state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
+                state.setVersion(state.getVersion() + 1);
+
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, 6, TimeUnit.SECONDS);
     }
 
     private void startFlagGame(GameRoomState state) {

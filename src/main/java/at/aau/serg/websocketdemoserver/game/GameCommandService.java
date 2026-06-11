@@ -367,10 +367,7 @@ public class GameCommandService {
         if(isCurrentCityOpenTarget(player)) {
             state.setValidMoveIds(new ArrayList<>());
 
-            if (player.getFreePassCount() <= 0) {
-                state.setPhase(GamePhase.MINIGAME);
-            }
-
+            state.setPhase(GamePhase.MINIGAME);
             state.setVersion(state.getVersion() + 1);
             return;
         }
@@ -767,7 +764,18 @@ public class GameCommandService {
     }
 
     private void handleUseFreePass(GameRoomState state, ClientCommand command) {
-        validateTurnContext(state, command);
+        if (state.isGameOver()) {
+            throw new GameException(ErrorCode.GAME_OVER, "Das Spiel ist bereits beendet");
+        }
+        if (state.getPhase() != GamePhase.IN_TURN && state.getPhase() != GamePhase.MINIGAME) {
+            throw new GameException(ErrorCode.INVALID_PHASE, "Command not allowed in current phase");
+        }
+        if (state.getCurrentPlayerId() == null) {
+            throw new GameException(ErrorCode.CURRENT_PLAYER_NOT_SET, "Current player is not set");
+        }
+        if (!state.getCurrentPlayerId().equals(command.getPlayerId())) {
+            throw new GameException(ErrorCode.NOT_YOUR_TURN, "Not your turn");
+        }
 
         PlayerState player = findPlayerState(state.getPlayers(), command.getPlayerId());
 
@@ -791,6 +799,10 @@ public class GameCommandService {
             state.setGameOver(true);
             broadcastGameOver(state, player.getPlayerId());
         }
+
+        state.setPhase(GamePhase.IN_TURN);
+        state.setMinigameSubPhase(null);
+        state.setSelectedMinigame(null);
 
         if(player.getRemainingSteps() <= 0){
             player.setRemainingSteps(0);

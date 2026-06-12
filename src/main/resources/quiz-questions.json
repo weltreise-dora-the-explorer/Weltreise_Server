@@ -1,0 +1,602 @@
+[
+  {
+    "id": "q1",
+    "questionText": "What is the capital of Australia?",
+    "correctAnswer": "Canberra",
+    "wrongAnswers": ["Sydney", "Melbourne", "Brisbane"]
+  },
+  {
+    "id": "q2",
+    "questionText": "Which is the smallest country in the world?",
+    "correctAnswer": "Vatican City",
+    "wrongAnswers": ["Monaco", "San Marino", "Liechtenstein"]
+  },
+  {
+    "id": "q3",
+    "questionText": "What is the longest river in the world?",
+    "correctAnswer": "Nile",
+    "wrongAnswers": ["Amazon", "Yangtze", "Mississippi"]
+  },
+  {
+    "id": "q4",
+    "questionText": "Which continent is the Sahara Desert located on?",
+    "correctAnswer": "Africa",
+    "wrongAnswers": ["Asia", "South America", "Australia"]
+  },
+  {
+    "id": "q5",
+    "questionText": "In which country is the Taj Mahal located?",
+    "correctAnswer": "India",
+    "wrongAnswers": ["Pakistan", "Bangladesh", "Nepal"]
+  },
+  {
+    "id": "q6",
+    "questionText": "Which ocean is the largest?",
+    "correctAnswer": "Pacific Ocean",
+    "wrongAnswers": ["Atlantic Ocean", "Indian Ocean", "Arctic Ocean"]
+  },
+  {
+    "id": "q7",
+    "questionText": "What is the capital of Canada?",
+    "correctAnswer": "Ottawa",
+    "wrongAnswers": ["Toronto", "Vancouver", "Montreal"]
+  },
+  {
+    "id": "q8",
+    "questionText": "Mount Everest is located in which mountain range?",
+    "correctAnswer": "Himalayas",
+    "wrongAnswers": ["Andes", "Alps", "Rocky Mountains"]
+  },
+  {
+    "id": "q9",
+    "questionText": "Which country has the most islands in the world?",
+    "correctAnswer": "Sweden",
+    "wrongAnswers": ["Indonesia", "Philippines", "Canada"]
+  },
+  {
+    "id": "q10",
+    "questionText": "What is the capital of Japan?",
+    "correctAnswer": "Tokyo",
+    "wrongAnswers": ["Kyoto", "Osaka", "Seoul"]
+  },
+  {
+    "id": "q11",
+    "questionText": "Which European city is known as the 'City of Canals'?",
+    "correctAnswer": "Venice",
+    "wrongAnswers": ["Amsterdam", "Bruges", "St. Petersburg"]
+  },
+  {
+    "id": "q12",
+    "questionText": "What is the official currency of Japan?",
+    "correctAnswer": "Yen",
+    "wrongAnswers": ["Won", "Yuan", "Ringgit"]
+  },
+  {
+    "id": "q13",
+    "questionText": "Which country is home to the kangaroo?",
+    "correctAnswer": "Australia",
+    "wrongAnswers": ["New Zealand", "South Africa", "Brazil"]
+  },
+  {
+    "id": "q14",
+    "questionText": "What is the capital of Brazil?",
+    "correctAnswer": "Brasília",
+    "wrongAnswers": ["Rio de Janeiro", "São Paulo", "Buenos Aires"]
+  },
+  {
+    "id": "q15",
+    "questionText": "The Great Barrier Reef is off the coast of which country?",
+    "correctAnswer": "Australia",
+    "wrongAnswers": ["Mexico", "Belize", "Indonesia"]
+  },
+  {
+    "id": "q16",
+    "questionText": "Which country shares the longest border with the USA?",
+    "correctAnswer": "Canada",
+    "wrongAnswers": ["Mexico", "Russia", "Cuba"]
+  },
+  {
+    "id": "q17",
+    "questionText": "Machu Picchu is an ancient city in which country?",
+    "correctAnswer": "Peru",
+    "wrongAnswers": ["Chile", "Colombia", "Mexico"]
+  },
+  {
+    "id": "q18",
+    "questionText": "What is the capital of Egypt?",
+    "correctAnswer": "Cairo",
+    "wrongAnswers": ["Alexandria", "Giza", "Luxor"]
+  },
+  {
+    "id": "q19",
+    "questionText": "Which is the largest country by area?",
+    "correctAnswer": "Russia",
+    "wrongAnswers": ["Canada", "China", "United States"]
+  },
+  {
+    "id": "q20",
+    "questionText": "Which African country has the largest population?",
+    "correctAnswer": "Nigeria",
+    "wrongAnswers": ["Egypt", "Ethiopia", "South Africa"]
+  },
+  {
+    "id": "q21",
+    "questionText": "The Eiffel Tower is located in which city?",
+    "correctAnswer": "Paris",
+    "wrongAnswers": ["London", "Rome", "Berlin"]
+  },
+  {
+    "id": "q22",
+    "questionText": "What is the capital of Argentina?",
+    "correctAnswer": "Buenos Aires",
+    "wrongAnswers": ["Santiago", "Lima", "Bogotá"]
+  },
+  {
+    "id": "q23",
+    "questionText": "Which sea lies between Europe and Africa?",
+    "correctAnswer": "Mediterranean Sea",
+    "wrongAnswers": ["Red Sea", "Black Sea", "Caspian Sea"]
+  },
+  {
+    "id": "q24",
+    "questionText": "What is the capital of South Korea?",
+    "correctAnswer": "Seoul",
+    "wrongAnswers": ["Pyongyang", "Busan", "Tokyo"]
+  },
+  {
+    "id": "q25",
+    "questionText": "Which desert is the largest hot desert in the world?",
+    "correctAnswer": "Sahara",
+    "wrongAnswers": ["Gobi", "Kalahari", "Mojave"]
+  },
+  {
+    "id": "q26",
+    "questionText": "In which city can you find the Colosseum?",
+    "correctAnswer": "Rome",
+    "wrongAnswers": ["Athens", "Naples", "Milan"]
+  },
+  {
+    "id": "q27",
+    "questionText": "What is the deepest point in the world's oceans?",
+    "correctAnswer": "Mariana Trench",
+    "wrongAnswers": ["Tonga Trench", "Puerto Rico Trench", "Java Trench"]
+  },
+  {
+    "id": "q28",
+    "questionText": "Which US state is an archipelago?",
+    "correctAnswer": "Hawaii",
+    "wrongAnswers": ["Alaska", "Florida", "California"]
+  },
+  {
+    "id": "q29",
+    "questionText": "What is the capital of Spain?",
+    "correctAnswer": "Madrid",
+    "wrongAnswers": ["Barcelona", "Seville", "Valencia"]
+  },
+  {
+    "id": "q30",
+    "questionText": "Which country is known as the Land of the Rising Sun?",
+    "correctAnswer": "Japan",
+    "wrongAnswers": ["China", "Thailand", "South Korea"]
+  },
+  {
+    "id": "q31",
+    "questionText": "The Amazon Rainforest is mostly located in which country?",
+    "correctAnswer": "Brazil",
+    "wrongAnswers": ["Peru", "Colombia", "Venezuela"]
+  },
+  {
+    "id": "q32",
+    "questionText": "What is the currency of the United Kingdom?",
+    "correctAnswer": "Pound Sterling",
+    "wrongAnswers": ["Euro", "Dollar", "Franc"]
+  },
+  {
+    "id": "q33",
+    "questionText": "Which river flows through London?",
+    "correctAnswer": "Thames",
+    "wrongAnswers": ["Seine", "Danube", "Rhine"]
+  },
+  {
+    "id": "q34",
+    "questionText": "What is the capital of New Zealand?",
+    "correctAnswer": "Wellington",
+    "wrongAnswers": ["Auckland", "Christchurch", "Sydney"]
+  },
+  {
+    "id": "q35",
+    "questionText": "Which European country is divided into cantons?",
+    "correctAnswer": "Switzerland",
+    "wrongAnswers": ["Austria", "Belgium", "Germany"]
+  },
+  {
+    "id": "q36",
+    "questionText": "Petra is a famous archaeological site in which country?",
+    "correctAnswer": "Jordan",
+    "wrongAnswers": ["Egypt", "Israel", "Syria"]
+  },
+  {
+    "id": "q37",
+    "questionText": "What is the largest island in the world?",
+    "correctAnswer": "Greenland",
+    "wrongAnswers": ["New Guinea", "Borneo", "Madagascar"]
+  },
+  {
+    "id": "q38",
+    "questionText": "Which city is known as the Big Apple?",
+    "correctAnswer": "New York City",
+    "wrongAnswers": ["Los Angeles", "Chicago", "Boston"]
+  },
+  {
+    "id": "q39",
+    "questionText": "What is the capital of Italy?",
+    "correctAnswer": "Rome",
+    "wrongAnswers": ["Venice", "Florence", "Milan"]
+  },
+  {
+    "id": "q40",
+    "questionText": "Which country has the longest coastline?",
+    "correctAnswer": "Canada",
+    "wrongAnswers": ["Australia", "Russia", "Indonesia"]
+  },
+  {
+    "id": "q41",
+    "questionText": "In which country is the fictional region of Transylvania?",
+    "correctAnswer": "Romania",
+    "wrongAnswers": ["Hungary", "Bulgaria", "Serbia"]
+  },
+  {
+    "id": "q42",
+    "questionText": "What is the official language of Brazil?",
+    "correctAnswer": "Portuguese",
+    "wrongAnswers": ["Spanish", "English", "French"]
+  },
+  {
+    "id": "q43",
+    "questionText": "Which US state is the largest by area?",
+    "correctAnswer": "Alaska",
+    "wrongAnswers": ["Texas", "California", "Montana"]
+  },
+  {
+    "id": "q44",
+    "questionText": "What is the capital of Thailand?",
+    "correctAnswer": "Bangkok",
+    "wrongAnswers": ["Phuket", "Chiang Mai", "Hanoi"]
+  },
+  {
+    "id": "q45",
+    "questionText": "The Galapagos Islands belong to which country?",
+    "correctAnswer": "Ecuador",
+    "wrongAnswers": ["Chile", "Peru", "Colombia"]
+  },
+  {
+    "id": "q46",
+    "questionText": "Which river flows through the Grand Canyon?",
+    "correctAnswer": "Colorado River",
+    "wrongAnswers": ["Mississippi River", "Snake River", "Rio Grande"]
+  },
+  {
+    "id": "q47",
+    "questionText": "What is the capital of South Africa?",
+    "correctAnswer": "Pretoria",
+    "wrongAnswers": ["Johannesburg", "Cape Town", "Durban"]
+  },
+  {
+    "id": "q48",
+    "questionText": "Which country is famous for its fjords?",
+    "correctAnswer": "Norway",
+    "wrongAnswers": ["Sweden", "Finland", "Denmark"]
+  },
+  {
+    "id": "q49",
+    "questionText": "The city of Istanbul is located in two continents. Europe and...?",
+    "correctAnswer": "Asia",
+    "wrongAnswers": ["Africa", "Australia", "North America"]
+  },
+  {
+    "id": "q50",
+    "questionText": "What is the capital of Russia?",
+    "correctAnswer": "Moscow",
+    "wrongAnswers": ["St. Petersburg", "Kiev", "Minsk"]
+  },
+  {
+    "id": "q51",
+    "questionText": "Which mountain is the highest in Africa?",
+    "correctAnswer": "Mount Kilimanjaro",
+    "wrongAnswers": ["Mount Kenya", "Mount Elgon", "Atlas Mountains"]
+  },
+  {
+    "id": "q52",
+    "questionText": "What is the currency of Switzerland?",
+    "correctAnswer": "Swiss Franc",
+    "wrongAnswers": ["Euro", "Krone", "Mark"]
+  },
+  {
+    "id": "q53",
+    "questionText": "Which country is completely surrounded by South Africa?",
+    "correctAnswer": "Lesotho",
+    "wrongAnswers": ["Swaziland", "Botswana", "Namibia"]
+  },
+  {
+    "id": "q54",
+    "questionText": "What is the capital of Sweden?",
+    "correctAnswer": "Stockholm",
+    "wrongAnswers": ["Oslo", "Helsinki", "Copenhagen"]
+  },
+  {
+    "id": "q55",
+    "questionText": "Which continent has the most countries?",
+    "correctAnswer": "Africa",
+    "wrongAnswers": ["Asia", "Europe", "South America"]
+  },
+  {
+    "id": "q56",
+    "questionText": "Angkor Wat is a famous temple complex in which country?",
+    "correctAnswer": "Cambodia",
+    "wrongAnswers": ["Thailand", "Vietnam", "Laos"]
+  },
+  {
+    "id": "q57",
+    "questionText": "What is the capital of Mexico?",
+    "correctAnswer": "Mexico City",
+    "wrongAnswers": ["Cancun", "Guadalajara", "Monterrey"]
+  },
+  {
+    "id": "q58",
+    "questionText": "Which ocean lies on the east coast of the United States?",
+    "correctAnswer": "Atlantic Ocean",
+    "wrongAnswers": ["Pacific Ocean", "Indian Ocean", "Arctic Ocean"]
+  },
+  {
+    "id": "q59",
+    "questionText": "What is the name of the longest mountain range on Earth?",
+    "correctAnswer": "The Andes",
+    "wrongAnswers": ["The Rockies", "The Himalayas", "The Alps"]
+  },
+  {
+    "id": "q60",
+    "questionText": "What is the capital of Turkey?",
+    "correctAnswer": "Ankara",
+    "wrongAnswers": ["Istanbul", "Izmir", "Antalya"]
+  },
+  {
+    "id": "q61",
+    "questionText": "Which country is known as the Land of Fire and Ice?",
+    "correctAnswer": "Iceland",
+    "wrongAnswers": ["Greenland", "New Zealand", "Norway"]
+  },
+  {
+    "id": "q62",
+    "questionText": "What is the currency of India?",
+    "correctAnswer": "Rupee",
+    "wrongAnswers": ["Rupiah", "Baht", "Taka"]
+  },
+  {
+    "id": "q63",
+    "questionText": "The Statue of Liberty was a gift to the USA from which country?",
+    "correctAnswer": "France",
+    "wrongAnswers": ["United Kingdom", "Spain", "Italy"]
+  },
+  {
+    "id": "q64",
+    "questionText": "What is the capital of Portugal?",
+    "correctAnswer": "Lisbon",
+    "wrongAnswers": ["Porto", "Madrid", "Faro"]
+  },
+  {
+    "id": "q65",
+    "questionText": "Which lake is the deepest in the world?",
+    "correctAnswer": "Lake Baikal",
+    "wrongAnswers": ["Lake Superior", "Lake Victoria", "Caspian Sea"]
+  },
+  {
+    "id": "q66",
+    "questionText": "What is the smallest continent by land area?",
+    "correctAnswer": "Australia",
+    "wrongAnswers": ["Europe", "Antarctica", "South America"]
+  },
+  {
+    "id": "q67",
+    "questionText": "Which city is the capital of the Netherlands?",
+    "correctAnswer": "Amsterdam",
+    "wrongAnswers": ["Rotterdam", "The Hague", "Utrecht"]
+  },
+  {
+    "id": "q68",
+    "questionText": "Where are the Spanish Steps located?",
+    "correctAnswer": "Rome",
+    "wrongAnswers": ["Madrid", "Barcelona", "Seville"]
+  },
+  {
+    "id": "q69",
+    "questionText": "Which river is the primary source of water for Egypt?",
+    "correctAnswer": "Nile",
+    "wrongAnswers": ["Tigris", "Euphrates", "Jordan"]
+  },
+  {
+    "id": "q70",
+    "questionText": "What is the capital of Greece?",
+    "correctAnswer": "Athens",
+    "wrongAnswers": ["Sparta", "Thessaloniki", "Crete"]
+  },
+  {
+    "id": "q71",
+    "questionText": "Which country has the shape of a boot?",
+    "correctAnswer": "Italy",
+    "wrongAnswers": ["Greece", "Spain", "Portugal"]
+  },
+  {
+    "id": "q72",
+    "questionText": "What is the highest waterfall in the world?",
+    "correctAnswer": "Angel Falls",
+    "wrongAnswers": ["Niagara Falls", "Victoria Falls", "Iguazu Falls"]
+  },
+  {
+    "id": "q73",
+    "questionText": "In which city is the Burj Khalifa located?",
+    "correctAnswer": "Dubai",
+    "wrongAnswers": ["Abu Dhabi", "Doha", "Riyadh"]
+  },
+  {
+    "id": "q74",
+    "questionText": "What is the capital of Ireland?",
+    "correctAnswer": "Dublin",
+    "wrongAnswers": ["Belfast", "Cork", "Galway"]
+  },
+  {
+    "id": "q75",
+    "questionText": "Which sea separates the UK from mainland Europe?",
+    "correctAnswer": "North Sea",
+    "wrongAnswers": ["Baltic Sea", "Mediterranean Sea", "Irish Sea"]
+  },
+  {
+    "id": "q76",
+    "questionText": "Which is the most spoken native language in the world?",
+    "correctAnswer": "Mandarin Chinese",
+    "wrongAnswers": ["English", "Spanish", "Hindi"]
+  },
+  {
+    "id": "q77",
+    "questionText": "What is the capital of China?",
+    "correctAnswer": "Beijing",
+    "wrongAnswers": ["Shanghai", "Hong Kong", "Shenzhen"]
+  },
+  {
+    "id": "q78",
+    "questionText": "The Gobi Desert is located in China and which other country?",
+    "correctAnswer": "Mongolia",
+    "wrongAnswers": ["Kazakhstan", "Russia", "Nepal"]
+  },
+  {
+    "id": "q79",
+    "questionText": "Which island is known as the Pearl of the Indian Ocean?",
+    "correctAnswer": "Sri Lanka",
+    "wrongAnswers": ["Maldives", "Madagascar", "Mauritius"]
+  },
+  {
+    "id": "q80",
+    "questionText": "What is the capital of Austria?",
+    "correctAnswer": "Vienna",
+    "wrongAnswers": ["Salzburg", "Graz", "Innsbruck"]
+  },
+  {
+    "id": "q81",
+    "questionText": "Which canal connects the Mediterranean Sea to the Red Sea?",
+    "correctAnswer": "Suez Canal",
+    "wrongAnswers": ["Panama Canal", "Kiel Canal", "Erie Canal"]
+  },
+  {
+    "id": "q82",
+    "questionText": "What is the largest desert in Asia?",
+    "correctAnswer": "Gobi Desert",
+    "wrongAnswers": ["Arabian Desert", "Thar Desert", "Karakum Desert"]
+  },
+  {
+    "id": "q83",
+    "questionText": "Which country is home to the ancient pyramids of Giza?",
+    "correctAnswer": "Egypt",
+    "wrongAnswers": ["Mexico", "Sudan", "Peru"]
+  },
+  {
+    "id": "q84",
+    "questionText": "What is the capital of Colombia?",
+    "correctAnswer": "Bogotá",
+    "wrongAnswers": ["Medellín", "Cali", "Cartagena"]
+  },
+  {
+    "id": "q85",
+    "questionText": "Which is the highest navigable lake in the world?",
+    "correctAnswer": "Lake Titicaca",
+    "wrongAnswers": ["Lake Victoria", "Lake Geneva", "Lake Tahoe"]
+  },
+  {
+    "id": "q86",
+    "questionText": "In which US city is the Golden Gate Bridge?",
+    "correctAnswer": "San Francisco",
+    "wrongAnswers": ["Los Angeles", "Seattle", "New York"]
+  },
+  {
+    "id": "q87",
+    "questionText": "What is the capital of Norway?",
+    "correctAnswer": "Oslo",
+    "wrongAnswers": ["Bergen", "Stockholm", "Copenhagen"]
+  },
+  {
+    "id": "q88",
+    "questionText": "The island of Bali is part of which country?",
+    "correctAnswer": "Indonesia",
+    "wrongAnswers": ["Thailand", "Malaysia", "Philippines"]
+  },
+  {
+    "id": "q89",
+    "questionText": "What is the longest river in Europe?",
+    "correctAnswer": "Volga",
+    "wrongAnswers": ["Danube", "Rhine", "Elbe"]
+  },
+  {
+    "id": "q90",
+    "questionText": "What is the capital of Kenya?",
+    "correctAnswer": "Nairobi",
+    "wrongAnswers": ["Mombasa", "Dodoma", "Kampala"]
+  },
+  {
+    "id": "q91",
+    "questionText": "Which South American country is landlocked?",
+    "correctAnswer": "Bolivia",
+    "wrongAnswers": ["Chile", "Peru", "Uruguay"]
+  },
+  {
+    "id": "q92",
+    "questionText": "What is the traditional name of the native people of New Zealand?",
+    "correctAnswer": "Māori",
+    "wrongAnswers": ["Aborigines", "Inuit", "Sami"]
+  },
+  {
+    "id": "q93",
+    "questionText": "What is the capital of Chile?",
+    "correctAnswer": "Santiago",
+    "wrongAnswers": ["Valparaíso", "Lima", "Buenos Aires"]
+  },
+  {
+    "id": "q94",
+    "questionText": "Which European city is famous for its thermal baths and Parliament building?",
+    "correctAnswer": "Budapest",
+    "wrongAnswers": ["Prague", "Vienna", "Warsaw"]
+  },
+  {
+    "id": "q95",
+    "questionText": "Mount Fuji is the highest peak in which country?",
+    "correctAnswer": "Japan",
+    "wrongAnswers": ["China", "South Korea", "Nepal"]
+  },
+  {
+    "id": "q96",
+    "questionText": "What is the capital of Cuba?",
+    "correctAnswer": "Havana",
+    "wrongAnswers": ["San Juan", "Kingston", "Nassau"]
+  },
+  {
+    "id": "q97",
+    "questionText": "Which country is the second largest in the world by land mass?",
+    "correctAnswer": "Canada",
+    "wrongAnswers": ["China", "United States", "Brazil"]
+  },
+  {
+    "id": "q98",
+    "questionText": "The ancient ruins of Chichen Itza are in which country?",
+    "correctAnswer": "Mexico",
+    "wrongAnswers": ["Guatemala", "Honduras", "Belize"]
+  },
+  {
+    "id": "q99",
+    "questionText": "What is the capital of Finland?",
+    "correctAnswer": "Helsinki",
+    "wrongAnswers": ["Oslo", "Stockholm", "Reykjavik"]
+  },
+  {
+    "id": "q100",
+    "questionText": "Which straight separates Europe and Asia in Istanbul?",
+    "correctAnswer": "Bosphorus",
+    "wrongAnswers": ["Strait of Gibraltar", "Dardanelles", "English Channel"]
+  }
+]

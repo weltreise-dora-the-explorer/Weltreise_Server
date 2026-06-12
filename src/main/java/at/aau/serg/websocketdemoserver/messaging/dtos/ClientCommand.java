@@ -23,6 +23,7 @@ public class ClientCommand {
     private String reportedPlayerId;
     private Integer guess;
 
+
     public ClientCommand(CommandType type, String lobbyId, String playerId, Integer moveSteps, Integer stops) {
         this(type, lobbyId, playerId, moveSteps, stops, null, null, null, null, null, null);
     }

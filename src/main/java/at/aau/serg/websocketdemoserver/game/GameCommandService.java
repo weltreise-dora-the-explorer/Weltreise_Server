@@ -1,11 +1,6 @@
 package at.aau.serg.websocketdemoserver.game;
 
-import at.aau.serg.websocketdemoserver.game.minigame.FlagQuestion;
-import at.aau.serg.websocketdemoserver.game.minigame.FlagQuestionPool;
-import at.aau.serg.websocketdemoserver.game.minigame.GuessQuestion;
-import at.aau.serg.websocketdemoserver.game.minigame.GuessQuestionPool;
-import at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase;
-import at.aau.serg.websocketdemoserver.game.minigame.MinigameType;
+import at.aau.serg.websocketdemoserver.game.minigame.*;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ClientCommand;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
@@ -50,6 +45,7 @@ public class GameCommandService {
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private final GuessQuestionPool guessQuestionPool = new GuessQuestionPool();
     private final FlagQuestionPool flagQuestionPool = new FlagQuestionPool();
+    private final QuizQuestionPool quizQuestionPool = new QuizQuestionPool();
     private static final int FLAG_ROUNDS = 5;
     private static final int FLAG_ROUND_SECONDS = 12;
     private static final int FLAG_REVEAL_SECONDS = 3;
@@ -224,6 +220,10 @@ public class GameCommandService {
             if (allConnectedPlayersAnswered(state)) {
                 revealFlagRound(state);
             }
+        } else if (state.getSelectedMinigame() == MinigameType.QUIZ_GAME) {
+            if(allConnectedPlayersAnswered(state)) {
+                evaluateQuizGame(state);
+                state.setVersion(state.getVersion() + 1); }
         } else if (state.getGuessSubmissions().size() == state.getPlayers().size()) {
             evaluateGuessGame(state);
             state.setVersion(state.getVersion() + 1);
@@ -458,7 +458,8 @@ public class GameCommandService {
         MinigameType[] types = {
                 MinigameType.GUESS_GAME,
                 MinigameType.FLAG_GAME,
-                MinigameType.REACTION_GAME
+                MinigameType.REACTION_GAME,
+                MinigameType.QUIZ_GAME
         };
         MinigameType selectedType = types[random.nextInt(types.length)];
 
@@ -475,6 +476,8 @@ public class GameCommandService {
             startFlagGame(state);
         } else if (selectedType == MinigameType.REACTION_GAME) {
             startReactionGame(state);
+        } else if (selectedType == MinigameType.QUIZ_GAME) {
+            startQuizGame(state);
         } else {
             startGuessGame(state);
         }
@@ -511,6 +514,73 @@ public class GameCommandService {
                 broadcastState(lobbyId, state);
             }
         }, 36, TimeUnit.SECONDS);
+    }
+    private void startQuizGame(GameRoomState state) {
+        QuizQuestion question = quizQuestionPool.generateRandomQuestion();
+
+        state.setQuizQuestionText(question.getQuestionText());
+        state.setQuizOptions(question.getOptions());
+        state.setQuizCorrectAnswerIndex(question.getOptions().indexOf(question.getCorrectAnswer()));
+
+        final int generation = state.getMinigameGeneration();
+        String lobbyId = state.getLobbyId();
+
+        //Intro-Phase (6 Sekunden), dann 10 Sekunden Timer starten
+        executor.schedule(() -> {
+            if (state.getMinigameGeneration() == generation
+                    && state.getMinigameSubPhase() == MinigameSubPhase.SELECTING) {
+                state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
+                state.setGuessTimerEndMillis(System.currentTimeMillis() + 10_000L);
+                state.setTimerDurationSeconds(10);
+                state.setVersion(state.getVersion() + 1);
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, 6, TimeUnit.SECONDS);
+
+        //nach 16 Sekunden (6s Intro + 10s Spielzeit) zwangsweise auflösen
+        executor.schedule(() -> {
+            if (state.getMinigameGeneration() == generation
+                    && state.getMinigameSubPhase() != MinigameSubPhase.RESULT) {
+                evaluateQuizGame(state);
+                state.setVersion(state.getVersion() + 1);
+                if (lobbyStore != null) lobbyStore.save();
+                broadcastState(lobbyId, state);
+            }
+        }, 16, TimeUnit.SECONDS);
+    }
+
+    private void evaluateQuizGame(GameRoomState state) {
+        Integer correctAnswerIndex = state.getQuizCorrectAnswerIndex();
+        if (correctAnswerIndex == null) correctAnswerIndex = 0; // Fallback
+
+        String winnerId = null;
+        long bestReactionTime = Long.MAX_VALUE;
+
+        for (PlayerState player : state.getPlayers()) {
+            String playerId = player.getPlayerId();
+            Integer playerGuessIndex = state.getGuessSubmissions().get(playerId);
+
+            if (playerGuessIndex == null) continue;
+
+            if (playerGuessIndex.equals(correctAnswerIndex)) {
+                Long submissionTimestamp = state.getGuessSubmissionTimestamps().get(playerId);
+                long timerStart = state.getGuessTimerEndMillis() - 10_000L;
+                long reactionTime = submissionTimestamp != null ? (submissionTimestamp - timerStart) : Long.MAX_VALUE;
+
+                if (reactionTime < bestReactionTime) {
+                    bestReactionTime = reactionTime;
+                    winnerId = playerId;
+                }
+            }
+        }
+
+        if (winnerId == null) {
+            winnerId = state.getCurrentPlayerId();
+        }
+
+        state.setMinigameWinnerPlayerId(winnerId);
+        state.setMinigameSubPhase(MinigameSubPhase.RESULT);
     }
 
     private void startReactionGame(GameRoomState state) {

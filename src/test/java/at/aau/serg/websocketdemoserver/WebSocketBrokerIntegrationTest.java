@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.messaging.converter.JacksonJsonMessageConverter;
+import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.messaging.converter.MessageConverter;
 import org.springframework.messaging.converter.StringMessageConverter;
 import org.springframework.messaging.simp.stomp.StompSession;
@@ -48,7 +48,7 @@ class WebSocketBrokerIntegrationTest {
     @Test
     void testWebSocketMessageBrokerHandleObject() throws Exception {
         BlockingQueue<StompMessage> messages = new LinkedBlockingDeque<>(); // Queue of messages from the server.
-        StompSession session = initStompSession(WEBSOCKET_TOPIC_OBJECT, new JacksonJsonMessageConverter(), messages, StompMessage.class);
+        StompSession session = initStompSession(WEBSOCKET_TOPIC_OBJECT, new MappingJackson2MessageConverter(), messages, StompMessage.class);
 
         // send a message object to the server
         StompMessage message = new StompMessage("client", "Test Object Message");

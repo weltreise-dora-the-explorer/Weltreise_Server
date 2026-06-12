@@ -10,7 +10,6 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
-import at.aau.serg.websocketdemoserver.messaging.dtos.StompMessage;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
@@ -47,6 +46,8 @@ public class WebSocketBrokerController {
             CommandType.SUBMIT_GUESS,
             CommandType.ANNOUNCE_MINIGAME_RESULT,
             CommandType.FINISH_MINIGAME,
+            CommandType.REACTION_READY,
+            CommandType.REACTION_PRESS,
             CommandType.USE_FREE_PASS,
             CommandType.USE_SHAKE_CHEAT,
             CommandType.REPORT_CHEAT,
@@ -69,19 +70,6 @@ public class WebSocketBrokerController {
         this.lobbyStore = lobbyStore;
         this.sessionRegistry = sessionRegistry;
         this.disconnectScheduler = disconnectScheduler;
-    }
-
-    @MessageMapping("/hello")
-    @SendTo("/topic/hello-response")
-    public String handleHello(String text) {
-        // TODO handle the messages here
-        return "echo from broker: "+text;
-    }
-    @MessageMapping("/object")
-    @SendTo("/topic/rcv-object")
-    public StompMessage handleObject(StompMessage msg) {
-
-       return msg;
     }
 
     @MessageMapping("/lobby/{lobbyId}/command")

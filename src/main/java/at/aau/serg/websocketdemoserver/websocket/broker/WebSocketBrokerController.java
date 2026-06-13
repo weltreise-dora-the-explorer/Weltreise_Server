@@ -59,17 +59,20 @@ public class WebSocketBrokerController {
     private final InMemoryLobbyStore lobbyStore;
     private final SessionRegistry sessionRegistry;
     private final DisconnectScheduler disconnectScheduler;
+    private final WebSocketCommandRateLimiter rateLimiter;
 
     public WebSocketBrokerController(LobbyService lobbyService,
                                      GameCommandService gameCommandService,
                                      InMemoryLobbyStore lobbyStore,
                                      SessionRegistry sessionRegistry,
-                                     DisconnectScheduler disconnectScheduler) {
+                                     DisconnectScheduler disconnectScheduler,
+                                     WebSocketCommandRateLimiter rateLimiter) {
         this.lobbyService = lobbyService;
         this.gameCommandService = gameCommandService;
         this.lobbyStore = lobbyStore;
         this.sessionRegistry = sessionRegistry;
         this.disconnectScheduler = disconnectScheduler;
+        this.rateLimiter = rateLimiter;
     }
 
     @MessageMapping("/lobby/{lobbyId}/command")
@@ -77,6 +80,8 @@ public class WebSocketBrokerController {
     public CommandResponse handleLobbyCommand(@DestinationVariable String lobbyId, ClientCommand command, SimpMessageHeaderAccessor headerAccessor) {
         CommandType commandType = command != null ? command.getType() : null;
         try {
+            rateLimiter.check(sessionId(headerAccessor), commandType);
+
             if (command == null || commandType == null) {
                 throw new GameException(ErrorCode.MISSING_COMMAND_TYPE, "Command type is required");
             }
@@ -216,5 +221,9 @@ public class WebSocketBrokerController {
         if (headerAccessor != null && headerAccessor.getSessionId() != null) {
             sessionRegistry.remove(headerAccessor.getSessionId());
         }
+    }
+
+    private String sessionId(SimpMessageHeaderAccessor headerAccessor) {
+        return headerAccessor != null ? headerAccessor.getSessionId() : null;
     }
 }

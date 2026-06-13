@@ -5,6 +5,7 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.websocket.StompFrameHandlerClientImpl;
+import at.aau.serg.websocketdemoserver.websocket.broker.WebSocketCommandRateLimiter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -153,6 +154,44 @@ class LobbyCommandFlowIntegrationTest {
         assertThat(response).isNotNull();
         assertThat(response.isSuccess()).isFalse();
         assertThat(response.getErrorCode()).isEqualTo(ErrorCode.MISSING_COMMAND_TYPE);
+    }
+
+    @Test
+    void commandFlowRateLimitsRepeatedLobbyAccessAttemptsPerSession() throws Exception {
+        String lobbyId = "integration-lobby-rate-limit-" + UUID.randomUUID();
+        BlockingQueue<CommandResponse> messages = new LinkedBlockingDeque<>();
+        StompSession session = initSession("/topic/lobby/" + lobbyId + "/events", messages);
+
+        for (int i = 0; i < WebSocketCommandRateLimiter.LOBBY_ACCESS_LIMIT; i++) {
+            ClientCommand command = new ClientCommand(
+                    CommandType.JOIN_LOBBY,
+                    null,
+                    "player-" + i,
+                    null,
+                    null
+            );
+            command.setClientId("client-" + i);
+            session.send("/app/lobby/" + lobbyId + "/command", command);
+
+            CommandResponse response = messages.poll(1, TimeUnit.SECONDS);
+            assertThat(response).isNotNull();
+            assertThat(response.getErrorCode()).isEqualTo(ErrorCode.LOBBY_NOT_FOUND);
+        }
+
+        ClientCommand blockedCommand = new ClientCommand(
+                CommandType.REJOIN_LOBBY,
+                null,
+                "blocked-player",
+                null,
+                null
+        );
+        blockedCommand.setClientId("blocked-client");
+        session.send("/app/lobby/" + lobbyId + "/command", blockedCommand);
+
+        CommandResponse blocked = messages.poll(1, TimeUnit.SECONDS);
+        assertThat(blocked).isNotNull();
+        assertThat(blocked.isSuccess()).isFalse();
+        assertThat(blocked.getErrorCode()).isEqualTo(ErrorCode.RATE_LIMIT_EXCEEDED);
     }
 
     private StompSession initSession(String destination, BlockingQueue<CommandResponse> queue) throws Exception {

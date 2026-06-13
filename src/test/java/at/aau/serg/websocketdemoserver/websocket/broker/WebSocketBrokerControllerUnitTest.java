@@ -34,9 +34,18 @@ class WebSocketBrokerControllerUnitTest {
     private SessionRegistry sessionRegistry;
     @Mock
     private DisconnectScheduler disconnectScheduler;
+    @Mock
+    private WebSocketCommandRateLimiter rateLimiter;
 
     private WebSocketBrokerController createController() {
-        return new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore, sessionRegistry, disconnectScheduler);
+        return new WebSocketBrokerController(
+                lobbyService,
+                gameCommandService,
+                lobbyStore,
+                sessionRegistry,
+                disconnectScheduler,
+                rateLimiter
+        );
     }
 
     private SimpMessageHeaderAccessor headerWithSession(String sessionId) {
@@ -460,5 +469,21 @@ class WebSocketBrokerControllerUnitTest {
         assertThat(response.isSuccess()).isFalse();
         assertThat(response.getErrorCode()).isEqualTo(ErrorCode.NOT_AUTHORIZED);
         verifyNoInteractions(gameCommandService);
+    }
+
+    @Test
+    void handleLobbyCommandChecksRateLimitBeforeProcessing() {
+        WebSocketBrokerController controller = createController();
+        ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null, null);
+        command.setClientId("client-host");
+        doThrow(new GameException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many commands"))
+                .when(rateLimiter).check("s1", CommandType.CREATE_LOBBY);
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.RATE_LIMIT_EXCEEDED);
+        verifyNoInteractions(lobbyService);
+        verifyNoInteractions(sessionRegistry);
     }
 }

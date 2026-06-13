@@ -8,6 +8,10 @@ import at.aau.serg.websocketdemoserver.game.models.CityColor;
 import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,10 +35,15 @@ public class LobbyService {
     }
 
     public GameRoomState createLobby(String lobbyId, String playerId) {
-        return createLobby(lobbyId, playerId, null);
+        return createLobbyInternal(lobbyId, playerId, null);
     }
 
     public GameRoomState createLobby(String lobbyId, String playerId, String clientId) {
+        validateClientId(clientId);
+        return createLobbyInternal(lobbyId, playerId, hashClientId(clientId));
+    }
+
+    private GameRoomState createLobbyInternal(String lobbyId, String playerId, String clientIdHash) {
         validatePlayerId(playerId);
         if (lobbyStore.get(lobbyId).isPresent()) {
             throw new GameException(ErrorCode.GAME_ALREADY_STARTED, "Lobby already exists");
@@ -42,16 +51,21 @@ public class LobbyService {
         GameRoomState newLobby = new GameRoomState();
         newLobby.setLobbyId(lobbyId);
         newLobby.setHostId(playerId);
-        newLobby.getPlayers().add(new PlayerState(playerId, clientId));
+        newLobby.getPlayers().add(new PlayerState(playerId, clientIdHash));
         lobbyStore.put(lobbyId, newLobby);
         return newLobby;
     }
 
     public GameRoomState joinLobby(String lobbyId, String playerId) {
-        return joinLobby(lobbyId, playerId, null);
+        return joinLobbyInternal(lobbyId, playerId, null);
     }
 
     public GameRoomState joinLobby(String lobbyId, String playerId, String clientId) {
+        validateClientId(clientId);
+        return joinLobbyInternal(lobbyId, playerId, hashClientId(clientId));
+    }
+
+    private GameRoomState joinLobbyInternal(String lobbyId, String playerId, String clientIdHash) {
         validatePlayerId(playerId);
         GameRoomState state = lobbyStore.get(lobbyId).orElseThrow(() ->
             new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby does not exist. Please check the Game PIN!")
@@ -67,7 +81,7 @@ public class LobbyService {
             throw new GameException(ErrorCode.PLAYER_ALREADY_JOINED, "Player already joined lobby");
         }
 
-        state.getPlayers().add(new PlayerState(playerId, clientId));
+        state.getPlayers().add(new PlayerState(playerId, clientIdHash));
         state.setVersion(state.getVersion() + 1);
         lobbyStore.save();
         return state;
@@ -97,18 +111,29 @@ public class LobbyService {
      */
     public GameRoomState rejoinLobby(String lobbyId, String playerId, String clientId) {
         validatePlayerId(playerId);
+        validateClientId(clientId);
         GameRoomState state = lobbyStore.get(lobbyId)
                 .orElseThrow(() -> new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby not found"));
 
         PlayerState player = findPlayer(state.getPlayers(), playerId)
                 .orElseThrow(() -> new GameException(ErrorCode.PLAYER_NOT_IN_LOBBY, "Player is not in lobby"));
 
-        if (clientId != null && player.getClientId() != null && !clientId.equals(player.getClientId())) {
-            throw new GameException(ErrorCode.PLAYER_NOT_IN_LOBBY, "Client id mismatch");
+        String storedClientId = player.getClientId();
+        if (storedClientId == null || storedClientId.isBlank()) {
+            throw new GameException(ErrorCode.NOT_AUTHORIZED, "Rejoin token is not available");
         }
 
-        if (player.getClientId() == null && clientId != null) {
-            player.setClientId(clientId);
+        String clientIdHash = hashClientId(clientId);
+        if (isSha256Hash(storedClientId)) {
+            if (!constantTimeEquals(storedClientId, clientIdHash)) {
+                throw new GameException(ErrorCode.NOT_AUTHORIZED, "Invalid rejoin token");
+            }
+        } else {
+            // Compatibility for lobbies persisted before client IDs were hashed.
+            if (!constantTimeEquals(storedClientId, clientId)) {
+                throw new GameException(ErrorCode.NOT_AUTHORIZED, "Invalid rejoin token");
+            }
+            player.setClientId(clientIdHash);
         }
 
         player.setConnected(true);
@@ -284,5 +309,37 @@ public class LobbyService {
         if (playerId == null || playerId.isBlank()) {
             throw new GameException(ErrorCode.MISSING_PLAYER_ID, "Player id is required");
         }
+    }
+
+    private void validateClientId(String clientId) {
+        if (clientId == null || clientId.isBlank()) {
+            throw new GameException(ErrorCode.MISSING_CLIENT_ID, "Client id is required");
+        }
+    }
+
+    private String hashClientId(String clientId) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(clientId.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is not available", ex);
+        }
+    }
+
+    private boolean isSha256Hash(String value) {
+        return value.length() == 64 && value.chars().allMatch(this::isHexCharacter);
+    }
+
+    private boolean isHexCharacter(int character) {
+        return character >= '0' && character <= '9'
+                || character >= 'a' && character <= 'f'
+                || character >= 'A' && character <= 'F';
+    }
+
+    private boolean constantTimeEquals(String left, String right) {
+        return MessageDigest.isEqual(
+                left.getBytes(StandardCharsets.UTF_8),
+                right.getBytes(StandardCharsets.UTF_8)
+        );
     }
 }

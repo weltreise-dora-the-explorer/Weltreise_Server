@@ -404,7 +404,9 @@ class LobbyServiceUnitTest {
     void createLobbyStoresClientIdOnHost() {
         GameRoomState state = service.createLobby("lobby-1", "host", "client-aaa");
 
-        assertThat(state.getPlayers().getFirst().getClientId()).isEqualTo("client-aaa");
+        assertThat(state.getPlayers().getFirst().getClientId())
+                .isNotEqualTo("client-aaa")
+                .matches("[0-9a-f]{64}");
         assertThat(state.getPlayers().getFirst().isConnected()).isTrue();
     }
 
@@ -422,7 +424,9 @@ class LobbyServiceUnitTest {
 
         GameRoomState state = service.joinLobby("lobby-1", "guest", "client-bbb");
 
-        assertThat(state.getPlayers().get(1).getClientId()).isEqualTo("client-bbb");
+        assertThat(state.getPlayers().get(1).getClientId())
+                .isNotEqualTo("client-bbb")
+                .matches("[0-9a-f]{64}");
         assertThat(state.getPlayers().get(1).isConnected()).isTrue();
     }
 
@@ -480,23 +484,23 @@ class LobbyServiceUnitTest {
     }
 
     @Test
-    void rejoinLobbyAcceptsNullClientIdWhenStoredIsAlsoNull() {
+    void rejoinLobbyRejectsNullClientId() {
         service.createLobby("lobby-1", "host");
         service.markPlayerDisconnected("lobby-1", "host");
 
-        GameRoomState state = service.rejoinLobby("lobby-1", "host", null);
-
-        assertThat(state.getPlayers().getFirst().isConnected()).isTrue();
+        assertThatThrownBy(() -> service.rejoinLobby("lobby-1", "host", null))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Client id is required");
     }
 
     @Test
-    void rejoinLobbyAssignsClientIdIfPreviouslyNull() {
+    void rejoinLobbyRejectsPlayerWithoutStoredClientId() {
         service.createLobby("lobby-1", "host");
         service.markPlayerDisconnected("lobby-1", "host");
 
-        GameRoomState state = service.rejoinLobby("lobby-1", "host", "client-new");
-
-        assertThat(state.getPlayers().getFirst().getClientId()).isEqualTo("client-new");
+        assertThatThrownBy(() -> service.rejoinLobby("lobby-1", "host", "client-new"))
+                .isInstanceOf(GameException.class)
+                .hasMessageContaining("Rejoin token is not available");
     }
 
     @Test
@@ -506,7 +510,20 @@ class LobbyServiceUnitTest {
 
         assertThatThrownBy(() -> service.rejoinLobby("lobby-1", "host", "client-bbb"))
                 .isInstanceOf(GameException.class)
-                .hasMessageContaining("Client id mismatch");
+                .hasMessageContaining("Invalid rejoin token");
+    }
+
+    @Test
+    void rejoinLobbyMigratesLegacyPlaintextClientIdToHash() {
+        GameRoomState state = service.createLobby("lobby-1", "host");
+        state.getPlayers().getFirst().setClientId("legacy-client-id");
+        service.markPlayerDisconnected("lobby-1", "host");
+
+        service.rejoinLobby("lobby-1", "host", "legacy-client-id");
+
+        assertThat(state.getPlayers().getFirst().getClientId())
+                .isNotEqualTo("legacy-client-id")
+                .matches("[0-9a-f]{64}");
     }
 
     @Test

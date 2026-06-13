@@ -53,6 +53,7 @@ class LobbyCommandFlowIntegrationTest {
         assertThat(create.isSuccess()).isTrue();
         assertThat(create.getCommandType()).isEqualTo(CommandType.CREATE_LOBBY);
         assertThat(create.getState().getPlayers()).hasSize(1);
+        assertThat(create.getState().getPlayers().getFirst().getClientId()).isNull();
 
         ClientCommand joinCommand = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-2", null, null);
         joinCommand.setClientId("client-2");
@@ -62,6 +63,8 @@ class LobbyCommandFlowIntegrationTest {
         assertThat(joinTwo).isNotNull();
         assertThat(joinTwo.isSuccess()).isTrue();
         assertThat(joinTwo.getState().getPlayers()).hasSize(2);
+        assertThat(joinTwo.getState().getPlayers())
+                .allSatisfy(player -> assertThat(player.getClientId()).isNull());
 
         p1Session.send("/app/lobby/" + lobbyId + "/command",
                 new ClientCommand(CommandType.START_GAME, null, "player-1", null, null));

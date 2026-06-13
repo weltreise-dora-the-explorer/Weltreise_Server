@@ -82,6 +82,12 @@ public class WebSocketBrokerController {
             }
             command.setLobbyId(lobbyId);
 
+            if (commandType == CommandType.CREATE_LOBBY
+                    || commandType == CommandType.JOIN_LOBBY
+                    || commandType == CommandType.REJOIN_LOBBY) {
+                requireClientId(command);
+            }
+
             if (PROTECTED_COMMANDS.contains(commandType)) {
                 requireAuthorizedSession(headerAccessor, lobbyId, command);
             }
@@ -191,6 +197,12 @@ public class WebSocketBrokerController {
                 || !command.getPlayerId().equals(info.playerId())) {
             throw new GameException(ErrorCode.NOT_AUTHORIZED,
                     "Session is not authorized to act as player '" + command.getPlayerId() + "'");
+        }
+    }
+
+    private void requireClientId(ClientCommand command) {
+        if (command.getClientId() == null || command.getClientId().isBlank()) {
+            throw new GameException(ErrorCode.MISSING_CLIENT_ID, "Client id is required");
         }
     }
 

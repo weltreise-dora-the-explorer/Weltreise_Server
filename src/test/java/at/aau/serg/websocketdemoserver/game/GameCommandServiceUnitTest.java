@@ -273,6 +273,49 @@ class GameCommandServiceUnitTest {
                 assertThat(question.getOptions()).hasSize(4).contains(question.getCorrectName()));
     }
 
+    @Test
+    void startQuizGameSetsFieldsExpectedByApp() {
+        GameCommandService service = new GameCommandService(new FixedRandom(3)); // QUIZ_GAME
+        GameRoomState state = inTurnState(defaultPlayers());
+        state.setPhase(GamePhase.MINIGAME);
+
+        service.processCommand(state, new ClientCommand(CommandType.START_MINIGAME, "lobby-1", "player-1", null, null));
+
+        assertThat(state.getSelectedMinigame())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameType.QUIZ_GAME);
+        assertThat(state.getMinigameSubPhase())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.SELECTING);
+        assertThat(state.getQuizQuestionText()).isNotBlank();
+        assertThat(state.getQuizOptions()).hasSize(4);
+        assertThat(state.getQuizCorrectAnswerIndex()).isBetween(0, 3);
+        assertThat(state.getGuessQuestionText()).isEqualTo(state.getQuizQuestionText());
+        assertThat(state.getGuessQuestionAnswer()).isEqualTo(state.getQuizCorrectAnswerIndex());
+    }
+
+    @Test
+    void quizSubmitRejectsOutOfRangeIndex() {
+        GameCommandService service = new GameCommandService(new FixedRandom(3));
+        GameRoomState state = quizGamePlaying(defaultPlayers());
+
+        assertThatThrownBy(() -> service.handleSubmitGuess(state, "player-1", 4))
+                .isInstanceOf(GameException.class);
+        assertThatThrownBy(() -> service.handleSubmitGuess(state, "player-1", -1))
+                .isInstanceOf(GameException.class);
+    }
+
+    @Test
+    void quizSubmitPicksFastestCorrectAnswerAsWinner() {
+        GameCommandService service = new GameCommandService(new FixedRandom(3));
+        GameRoomState state = quizGamePlaying(defaultPlayers());
+
+        service.handleSubmitGuess(state, "player-1", 2);
+        service.handleSubmitGuess(state, "player-2", 1);
+
+        assertThat(state.getMinigameWinnerPlayerId()).isEqualTo("player-1");
+        assertThat(state.getMinigameSubPhase())
+                .isEqualTo(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.RESULT);
+    }
+
     /** Startet ein Flaggenspiel und versetzt es synchron in Runde 0 (PLAYING). */
     private GameRoomState flagGamePlayingRoundZero(GameCommandService service, List<PlayerState> players) {
         GameRoomState state = inTurnState(players);
@@ -287,6 +330,19 @@ class GameCommandServiceUnitTest {
         state.getGuessSubmissions().clear();
         state.getGuessSubmissionTimestamps().clear();
         state.setMinigameSubPhase(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.PLAYING);
+        return state;
+    }
+
+    private GameRoomState quizGamePlaying(List<PlayerState> players) {
+        GameRoomState state = inTurnState(players);
+        state.setPhase(GamePhase.MINIGAME);
+        state.setSelectedMinigame(at.aau.serg.websocketdemoserver.game.minigame.MinigameType.QUIZ_GAME);
+        state.setMinigameSubPhase(at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase.PLAYING);
+        state.setQuizOptions(List.of("A", "B", "C", "D"));
+        state.setQuizCorrectAnswerIndex(2);
+        state.setGuessQuestionAnswer(2);
+        state.setGuessTimerEndMillis(System.currentTimeMillis() + 20_000L);
+        state.setTimerDurationSeconds(20);
         return state;
     }
 

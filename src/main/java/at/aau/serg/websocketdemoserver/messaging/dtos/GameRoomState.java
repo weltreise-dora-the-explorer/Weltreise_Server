@@ -64,6 +64,11 @@ public class GameRoomState {
     private Map<String, Integer> flagScores = new HashMap<>();
     private Map<String, Long> flagTotalTimeMs = new HashMap<>();
 
+    //Quiz Minigame
+    private String quizQuestionText;
+    private List<String> quizOptions = new ArrayList<>();
+    private Integer quizCorrectAnswerIndex;
+
     // Antwort-Schlüssel der 5 Runden – serverseitig, NICHT im Broadcast/Persist
     @JsonIgnore
     private List<FlagQuestion> flagRounds = new ArrayList<>();
@@ -75,6 +80,6 @@ public class GameRoomState {
                 new ArrayList<>(), GameMode.CITY_HOPPER, false, null, null, null,
                 null, null, null, null, 0L, new HashMap<>(), new HashMap<>(), null, 0,
                 new ArrayList<>(), null, null, null, null, new HashMap<>(),
-                0, null, new ArrayList<>(), null, new HashMap<>(), new HashMap<>(), new ArrayList<>());
+                0, null, new ArrayList<>(), null, new HashMap<>(), new HashMap<>(), null, null, null, new ArrayList<>());
     }
 }

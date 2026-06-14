@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -41,7 +42,9 @@ public class LobbyPersistence {
         this.dataDir = Paths.get(dataDir);
         this.lobbiesFile = this.dataDir.resolve(FILE_NAME);
         this.lobbiesTmpFile = this.dataDir.resolve(TMP_FILE_NAME);
-        this.objectMapper = JsonMapper.builder().build();
+        this.objectMapper = JsonMapper.builder()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
     }
 
     /**
@@ -49,7 +52,7 @@ public class LobbyPersistence {
      * Gibt eine leere Map zurueck, wenn die Datei fehlt oder korrupt ist
      * (der Spielbetrieb soll auch in diesem Fall starten koennen).
      */
-    public Map<String, GameRoomState> loadAll() {
+    public synchronized Map<String, GameRoomState> loadAll() {
         if (!Files.exists(lobbiesFile)) {
             return new HashMap<>();
         }

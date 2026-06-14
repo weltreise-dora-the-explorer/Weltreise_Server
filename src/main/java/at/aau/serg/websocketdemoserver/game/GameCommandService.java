@@ -49,6 +49,9 @@ public class GameCommandService {
     private static final int FLAG_ROUNDS = 5;
     private static final int FLAG_ROUND_SECONDS = 12;
     private static final int FLAG_REVEAL_SECONDS = 3;
+    private static final int QUIZ_UI_INTRO_SECONDS = 10;
+    private static final int QUIZ_ANSWER_SECONDS = 10;
+    private static final int QUIZ_PLAYING_SECONDS = QUIZ_UI_INTRO_SECONDS + QUIZ_ANSWER_SECONDS;
     private InMemoryLobbyStore lobbyStore;
 
     @Autowired(required = false)
@@ -212,6 +215,11 @@ public class GameCommandService {
             throw new GameException(ErrorCode.INVALID_COMMAND, "Option index out of range");
         }
 
+        boolean quizGame = state.getSelectedMinigame() == MinigameType.QUIZ_GAME;
+        if (quizGame && (guess < 0 || guess >= state.getQuizOptions().size())) {
+            throw new GameException(ErrorCode.INVALID_COMMAND, "Option index out of range");
+        }
+
         state.getGuessSubmissions().put(playerId, guess);
         state.getGuessSubmissionTimestamps().put(playerId, System.currentTimeMillis());
         state.setVersion(state.getVersion() + 1);
@@ -220,7 +228,7 @@ public class GameCommandService {
             if (allConnectedPlayersAnswered(state)) {
                 revealFlagRound(state);
             }
-        } else if (state.getSelectedMinigame() == MinigameType.QUIZ_GAME) {
+        } else if (quizGame) {
             if(allConnectedPlayersAnswered(state)) {
                 evaluateQuizGame(state);
                 state.setVersion(state.getVersion() + 1); }
@@ -464,6 +472,7 @@ public class GameCommandService {
         state.getGuessSubmissions().clear();
         state.getGuessSubmissionTimestamps().clear();
         resetReactionMinigameState(state);
+        clearQuizMinigameState(state);
 
         state.setMinigameGeneration(state.getMinigameGeneration() + 1);
         state.setSelectedMinigame(selectedType);
@@ -515,28 +524,32 @@ public class GameCommandService {
     }
     private void startQuizGame(GameRoomState state) {
         QuizQuestion question = quizQuestionPool.generateRandomQuestion();
+        int correctAnswerIndex = question.getOptions().indexOf(question.getCorrectAnswer());
 
         state.setQuizQuestionText(question.getQuestionText());
         state.setQuizOptions(question.getOptions());
-        state.setQuizCorrectAnswerIndex(question.getOptions().indexOf(question.getCorrectAnswer()));
+        state.setQuizCorrectAnswerIndex(correctAnswerIndex);
+        state.setGuessQuestionText(question.getQuestionText());
+        state.setGuessQuestionAnswer(correctAnswerIndex);
 
         final int generation = state.getMinigameGeneration();
         String lobbyId = state.getLobbyId();
 
-        //Intro-Phase (6 Sekunden), dann 10 Sekunden Timer starten
+        // Nach SELECTING beginnt PLAYING. Die App zeigt darin erst 10s VS/Frage,
+        // danach bleiben 10s echte Antwortzeit.
         executor.schedule(() -> {
             if (state.getMinigameGeneration() == generation
                     && state.getMinigameSubPhase() == MinigameSubPhase.SELECTING) {
                 state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
-                state.setGuessTimerEndMillis(System.currentTimeMillis() + 10_000L);
-                state.setTimerDurationSeconds(10);
+                state.setGuessTimerEndMillis(System.currentTimeMillis() + QUIZ_PLAYING_SECONDS * 1000L);
+                state.setTimerDurationSeconds(QUIZ_PLAYING_SECONDS);
                 state.setVersion(state.getVersion() + 1);
                 if (lobbyStore != null) lobbyStore.save();
                 broadcastState(lobbyId, state);
             }
         }, 6, TimeUnit.SECONDS);
 
-        //nach 16 Sekunden (6s Intro + 10s Spielzeit) zwangsweise auflösen
+        // Nach SELECTING + PLAYING zwangsweise auflösen.
         executor.schedule(() -> {
             if (state.getMinigameGeneration() == generation
                     && state.getMinigameSubPhase() != MinigameSubPhase.RESULT) {
@@ -545,7 +558,7 @@ public class GameCommandService {
                 if (lobbyStore != null) lobbyStore.save();
                 broadcastState(lobbyId, state);
             }
-        }, 16, TimeUnit.SECONDS);
+        }, 6L + QUIZ_PLAYING_SECONDS, TimeUnit.SECONDS);
     }
 
     private void evaluateQuizGame(GameRoomState state) {
@@ -563,8 +576,10 @@ public class GameCommandService {
 
             if (playerGuessIndex.equals(correctAnswerIndex)) {
                 Long submissionTimestamp = state.getGuessSubmissionTimestamps().get(playerId);
-                long timerStart = state.getGuessTimerEndMillis() - 10_000L;
-                long reactionTime = submissionTimestamp != null ? (submissionTimestamp - timerStart) : Long.MAX_VALUE;
+                long timerStart = state.getGuessTimerEndMillis() - QUIZ_ANSWER_SECONDS * 1000L;
+                long reactionTime = submissionTimestamp != null
+                        ? Math.max(0L, submissionTimestamp - timerStart)
+                        : Long.MAX_VALUE;
 
                 if (reactionTime < bestReactionTime) {
                     bestReactionTime = reactionTime;
@@ -847,6 +862,7 @@ public class GameCommandService {
         state.setTimerDurationSeconds(null);
         state.getGuessSubmissions().clear();
         state.getGuessSubmissionTimestamps().clear();
+        clearQuizMinigameState(state);
         state.setPhase(GamePhase.IN_TURN);
         state.setVersion(state.getVersion() + 1);
     }
@@ -1184,6 +1200,12 @@ public class GameCommandService {
         state.setReactionRoundEndsAtMs(null);
         state.getReactionPressTimesMs().clear();
         state.setMinigameWinnerPlayerId(null);
+    }
+
+    private void clearQuizMinigameState(GameRoomState state) {
+        state.setQuizQuestionText(null);
+        state.setQuizOptions(new ArrayList<>());
+        state.setQuizCorrectAnswerIndex(null);
     }
 
     private void finishReactionRoundIfTimedOut(GameRoomState state, long now) {

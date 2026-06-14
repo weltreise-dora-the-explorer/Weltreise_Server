@@ -10,9 +10,10 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.stereotype.Controller;
 
@@ -60,23 +61,40 @@ public class WebSocketBrokerController {
     private final SessionRegistry sessionRegistry;
     private final DisconnectScheduler disconnectScheduler;
     private final WebSocketCommandRateLimiter rateLimiter;
+    private final SimpMessagingTemplate messagingTemplate;
 
+    @Autowired
     public WebSocketBrokerController(LobbyService lobbyService,
                                      GameCommandService gameCommandService,
                                      InMemoryLobbyStore lobbyStore,
                                      SessionRegistry sessionRegistry,
                                      DisconnectScheduler disconnectScheduler,
-                                     WebSocketCommandRateLimiter rateLimiter) {
+                                     WebSocketCommandRateLimiter rateLimiter,
+                                     SimpMessagingTemplate messagingTemplate) {
         this.lobbyService = lobbyService;
         this.gameCommandService = gameCommandService;
         this.lobbyStore = lobbyStore;
         this.sessionRegistry = sessionRegistry;
         this.disconnectScheduler = disconnectScheduler;
         this.rateLimiter = rateLimiter;
+        this.messagingTemplate = messagingTemplate;
+    }
+
+    WebSocketBrokerController(LobbyService lobbyService,
+                              GameCommandService gameCommandService,
+                              InMemoryLobbyStore lobbyStore,
+                              SessionRegistry sessionRegistry,
+                              DisconnectScheduler disconnectScheduler,
+                              WebSocketCommandRateLimiter rateLimiter) {
+        this(lobbyService, gameCommandService, lobbyStore, sessionRegistry, disconnectScheduler, rateLimiter, null);
     }
 
     @MessageMapping("/lobby/{lobbyId}/command")
-    @SendTo("/topic/lobby/{lobbyId}/events")
+    public void handleLobbyCommandMessage(@DestinationVariable String lobbyId, ClientCommand command, SimpMessageHeaderAccessor headerAccessor) {
+        CommandResponse response = handleLobbyCommand(lobbyId, command, headerAccessor);
+        messagingTemplate.convertAndSend(WebSocketTopics.lobbyEvents(lobbyId), response);
+    }
+
     public CommandResponse handleLobbyCommand(@DestinationVariable String lobbyId, ClientCommand command, SimpMessageHeaderAccessor headerAccessor) {
         CommandType commandType = command != null ? command.getType() : null;
         try {

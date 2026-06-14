@@ -34,9 +34,18 @@ class WebSocketBrokerControllerUnitTest {
     private SessionRegistry sessionRegistry;
     @Mock
     private DisconnectScheduler disconnectScheduler;
+    @Mock
+    private WebSocketCommandRateLimiter rateLimiter;
 
     private WebSocketBrokerController createController() {
-        return new WebSocketBrokerController(lobbyService, gameCommandService, lobbyStore, sessionRegistry, disconnectScheduler);
+        return new WebSocketBrokerController(
+                lobbyService,
+                gameCommandService,
+                lobbyStore,
+                sessionRegistry,
+                disconnectScheduler,
+                rateLimiter
+        );
     }
 
     private SimpMessageHeaderAccessor headerWithSession(String sessionId) {
@@ -55,10 +64,11 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandRoutesCreateLobbyAndReturnsSuccessResponse() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null, null);
+        command.setClientId("client-host");
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");
 
-        when(lobbyService.createLobby("lobby-1", "host-player", null)).thenReturn(state);
+        when(lobbyService.createLobby("lobby-1", "host-player", "client-host")).thenReturn(state);
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
 
@@ -67,14 +77,15 @@ class WebSocketBrokerControllerUnitTest {
         assertThat(response.getLobbyId()).isEqualTo("lobby-1");
         assertThat(response.getCommandType()).isEqualTo(CommandType.CREATE_LOBBY);
         assertThat(response.getState()).isEqualTo(state);
-        verify(lobbyService).createLobby("lobby-1", "host-player", null);
+        verify(lobbyService).createLobby("lobby-1", "host-player", "client-host");
     }
 
     @Test
     void handleLobbyCommandRegistersSessionOnCreateLobby() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null, null);
-        when(lobbyService.createLobby("lobby-1", "host-player", null)).thenReturn(new GameRoomState());
+        command.setClientId("client-host");
+        when(lobbyService.createLobby("lobby-1", "host-player", "client-host")).thenReturn(new GameRoomState());
 
         controller.handleLobbyCommand("lobby-1", command, headerWithSession("session-abc"));
 
@@ -85,7 +96,8 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandRegistersSessionOnJoinLobby() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-1", null, null);
-        when(lobbyService.joinLobby("lobby-1", "player-1", null)).thenReturn(new GameRoomState());
+        command.setClientId("client-player-1");
+        when(lobbyService.joinLobby("lobby-1", "player-1", "client-player-1")).thenReturn(new GameRoomState());
 
         controller.handleLobbyCommand("lobby-1", command, headerWithSession("session-xyz"));
 
@@ -108,7 +120,8 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandDoesNotRegisterSessionWhenHeaderAccessorIsNull() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null, null);
-        when(lobbyService.createLobby("lobby-1", "host-player", null)).thenReturn(new GameRoomState());
+        command.setClientId("client-host");
+        when(lobbyService.createLobby("lobby-1", "host-player", "client-host")).thenReturn(new GameRoomState());
 
         controller.handleLobbyCommand("lobby-1", command, null);
 
@@ -119,9 +132,10 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandReturnsErrorWhenLobbyAlreadyExists() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null, null);
+        command.setClientId("client-host");
 
         doThrow(new GameException(ErrorCode.GAME_ALREADY_STARTED, "Lobby already exists"))
-                .when(lobbyService).createLobby("lobby-1", "host-player", null);
+                .when(lobbyService).createLobby("lobby-1", "host-player", "client-host");
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
 
@@ -135,10 +149,11 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandRoutesJoinAndReturnsSuccessResponse() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-1", null, null);
+        command.setClientId("client-player-1");
         GameRoomState state = new GameRoomState();
         state.setLobbyId("lobby-1");
 
-        when(lobbyService.joinLobby("lobby-1", "player-1", null)).thenReturn(state);
+        when(lobbyService.joinLobby("lobby-1", "player-1", "client-player-1")).thenReturn(state);
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
 
@@ -147,16 +162,17 @@ class WebSocketBrokerControllerUnitTest {
         assertThat(response.getLobbyId()).isEqualTo("lobby-1");
         assertThat(response.getCommandType()).isEqualTo(CommandType.JOIN_LOBBY);
         assertThat(response.getState()).isEqualTo(state);
-        verify(lobbyService).joinLobby("lobby-1", "player-1", null);
+        verify(lobbyService).joinLobby("lobby-1", "player-1", "client-player-1");
     }
 
     @Test
     void handleLobbyCommandReturnsErrorWhenLobbyDoesNotExist() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-1", null, null);
+        command.setClientId("client-player-1");
 
         doThrow(new GameException(ErrorCode.LOBBY_NOT_FOUND, "Lobby does not exist"))
-                .when(lobbyService).joinLobby("lobby-1", "player-1", null);
+                .when(lobbyService).joinLobby("lobby-1", "player-1", "client-player-1");
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
 
@@ -243,9 +259,10 @@ class WebSocketBrokerControllerUnitTest {
     void handleLobbyCommandReturnsLobbyFullErrorWhenLobbyIsFull() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.JOIN_LOBBY, null, "player-5", null, null);
+        command.setClientId("client-player-5");
 
         doThrow(new GameException(ErrorCode.LOBBY_FULL, "Lobby is full"))
-                .when(lobbyService).joinLobby("lobby-1", "player-5", null);
+                .when(lobbyService).joinLobby("lobby-1", "player-5", "client-player-5");
 
         CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
 
@@ -363,6 +380,31 @@ class WebSocketBrokerControllerUnitTest {
     }
 
     @Test
+    void handleLobbyCommandRejectsCreateWithoutClientId() {
+        WebSocketBrokerController controller = createController();
+        ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null, null);
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.MISSING_CLIENT_ID);
+        verifyNoInteractions(lobbyService);
+    }
+
+    @Test
+    void handleLobbyCommandRejectsRejoinWithoutClientId() {
+        WebSocketBrokerController controller = createController();
+        ClientCommand command = new ClientCommand(CommandType.REJOIN_LOBBY, null, "player-1", null, null);
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.MISSING_CLIENT_ID);
+        verifyNoInteractions(lobbyService);
+        verifyNoInteractions(sessionRegistry);
+    }
+
+    @Test
     void handleLobbyCommandCancelsDisconnectSchedulerOnLeave() {
         WebSocketBrokerController controller = createController();
         ClientCommand command = new ClientCommand(CommandType.LEAVE_LOBBY, null, "player-1", null, null);
@@ -427,5 +469,21 @@ class WebSocketBrokerControllerUnitTest {
         assertThat(response.isSuccess()).isFalse();
         assertThat(response.getErrorCode()).isEqualTo(ErrorCode.NOT_AUTHORIZED);
         verifyNoInteractions(gameCommandService);
+    }
+
+    @Test
+    void handleLobbyCommandChecksRateLimitBeforeProcessing() {
+        WebSocketBrokerController controller = createController();
+        ClientCommand command = new ClientCommand(CommandType.CREATE_LOBBY, null, "host-player", null, null);
+        command.setClientId("client-host");
+        doThrow(new GameException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many commands"))
+                .when(rateLimiter).check("s1", CommandType.CREATE_LOBBY);
+
+        CommandResponse response = controller.handleLobbyCommand("lobby-1", command, headerWithSession("s1"));
+
+        assertThat(response.isSuccess()).isFalse();
+        assertThat(response.getErrorCode()).isEqualTo(ErrorCode.RATE_LIMIT_EXCEEDED);
+        verifyNoInteractions(lobbyService);
+        verifyNoInteractions(sessionRegistry);
     }
 }

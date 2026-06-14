@@ -10,7 +10,6 @@ import at.aau.serg.websocketdemoserver.messaging.dtos.CommandResponse;
 import at.aau.serg.websocketdemoserver.messaging.dtos.CommandType;
 import at.aau.serg.websocketdemoserver.messaging.dtos.ErrorCode;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
-import at.aau.serg.websocketdemoserver.messaging.dtos.StompMessage;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
@@ -47,6 +46,8 @@ public class WebSocketBrokerController {
             CommandType.SUBMIT_GUESS,
             CommandType.ANNOUNCE_MINIGAME_RESULT,
             CommandType.FINISH_MINIGAME,
+            CommandType.REACTION_READY,
+            CommandType.REACTION_PRESS,
             CommandType.USE_FREE_PASS,
             CommandType.USE_SHAKE_CHEAT,
             CommandType.REPORT_CHEAT,
@@ -58,30 +59,20 @@ public class WebSocketBrokerController {
     private final InMemoryLobbyStore lobbyStore;
     private final SessionRegistry sessionRegistry;
     private final DisconnectScheduler disconnectScheduler;
+    private final WebSocketCommandRateLimiter rateLimiter;
 
     public WebSocketBrokerController(LobbyService lobbyService,
                                      GameCommandService gameCommandService,
                                      InMemoryLobbyStore lobbyStore,
                                      SessionRegistry sessionRegistry,
-                                     DisconnectScheduler disconnectScheduler) {
+                                     DisconnectScheduler disconnectScheduler,
+                                     WebSocketCommandRateLimiter rateLimiter) {
         this.lobbyService = lobbyService;
         this.gameCommandService = gameCommandService;
         this.lobbyStore = lobbyStore;
         this.sessionRegistry = sessionRegistry;
         this.disconnectScheduler = disconnectScheduler;
-    }
-
-    @MessageMapping("/hello")
-    @SendTo("/topic/hello-response")
-    public String handleHello(String text) {
-        // TODO handle the messages here
-        return "echo from broker: "+text;
-    }
-    @MessageMapping("/object")
-    @SendTo("/topic/rcv-object")
-    public StompMessage handleObject(StompMessage msg) {
-
-       return msg;
+        this.rateLimiter = rateLimiter;
     }
 
     @MessageMapping("/lobby/{lobbyId}/command")
@@ -89,10 +80,18 @@ public class WebSocketBrokerController {
     public CommandResponse handleLobbyCommand(@DestinationVariable String lobbyId, ClientCommand command, SimpMessageHeaderAccessor headerAccessor) {
         CommandType commandType = command != null ? command.getType() : null;
         try {
+            rateLimiter.check(sessionId(headerAccessor), commandType);
+
             if (command == null || commandType == null) {
                 throw new GameException(ErrorCode.MISSING_COMMAND_TYPE, "Command type is required");
             }
             command.setLobbyId(lobbyId);
+
+            if (commandType == CommandType.CREATE_LOBBY
+                    || commandType == CommandType.JOIN_LOBBY
+                    || commandType == CommandType.REJOIN_LOBBY) {
+                requireClientId(command);
+            }
 
             if (PROTECTED_COMMANDS.contains(commandType)) {
                 requireAuthorizedSession(headerAccessor, lobbyId, command);
@@ -206,6 +205,12 @@ public class WebSocketBrokerController {
         }
     }
 
+    private void requireClientId(ClientCommand command) {
+        if (command.getClientId() == null || command.getClientId().isBlank()) {
+            throw new GameException(ErrorCode.MISSING_CLIENT_ID, "Client id is required");
+        }
+    }
+
     private void registerSession(SimpMessageHeaderAccessor headerAccessor, String lobbyId, String playerId) {
         if (headerAccessor != null && headerAccessor.getSessionId() != null) {
             sessionRegistry.register(headerAccessor.getSessionId(), lobbyId, playerId);
@@ -216,5 +221,9 @@ public class WebSocketBrokerController {
         if (headerAccessor != null && headerAccessor.getSessionId() != null) {
             sessionRegistry.remove(headerAccessor.getSessionId());
         }
+    }
+
+    private String sessionId(SimpMessageHeaderAccessor headerAccessor) {
+        return headerAccessor != null ? headerAccessor.getSessionId() : null;
     }
 }

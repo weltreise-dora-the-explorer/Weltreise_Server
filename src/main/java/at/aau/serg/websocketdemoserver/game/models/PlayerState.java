@@ -1,5 +1,6 @@
 package at.aau.serg.websocketdemoserver.game.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -43,6 +44,11 @@ public class PlayerState {
     public PlayerState(String playerId, String clientId) {
         this.playerId = playerId;
         this.clientId = clientId;
+    }
+
+    @JsonIgnore
+    public String getClientId() {
+        return clientId;
     }
 
     /**

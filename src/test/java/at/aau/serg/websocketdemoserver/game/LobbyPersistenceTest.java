@@ -1,5 +1,6 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.models.PlayerState;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,6 +38,20 @@ class LobbyPersistenceTest {
         assertThat(loaded.get("lobby-1").getLobbyId()).isEqualTo("lobby-1");
         assertThat(loaded.get("lobby-1").getHostId()).isEqualTo("host-1");
         assertThat(loaded.get("lobby-1").getVersion()).isEqualTo(42L);
+    }
+
+    @Test
+    void saveAllAndLoadAllPreservesClientIdHash(@TempDir Path tempDir) {
+        LobbyPersistence persistence = new LobbyPersistence(tempDir.toString());
+        String clientIdHash = "a".repeat(64);
+        GameRoomState state = new GameRoomState();
+        state.setLobbyId("lobby-1");
+        state.getPlayers().add(new PlayerState("player-1", clientIdHash));
+
+        persistence.saveAll(Map.of("lobby-1", state));
+        GameRoomState loaded = persistence.loadAll().get("lobby-1");
+
+        assertThat(loaded.getPlayers().getFirst().getClientId()).isEqualTo(clientIdHash);
     }
 
     @Test

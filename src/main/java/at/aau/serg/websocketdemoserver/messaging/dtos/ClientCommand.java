@@ -18,14 +18,39 @@ public class ClientCommand {
     private Integer stops;
     private String targetCityId;
     private GameMode gameMode;
+    private String winnerPlayerId;
     private String clientId;
+    private String reportedPlayerId;
+    private Integer guess;
+
 
     public ClientCommand(CommandType type, String lobbyId, String playerId, Integer moveSteps, Integer stops) {
-        this(type, lobbyId, playerId, moveSteps, stops, null, null, null);
+        this(type, lobbyId, playerId, moveSteps, stops, null, null, null, null, null, null);
     }
 
-    public ClientCommand(CommandType type, String lobbyId, String playerId, Integer moveSteps, Integer stops,
-                         String targetCityId, GameMode gameMode) {
-        this(type, lobbyId, playerId, moveSteps, stops, targetCityId, gameMode, null);
+    public ClientCommand(
+            CommandType type,
+            String lobbyId,
+            String playerId,
+            Integer moveSteps,
+            Integer stops,
+            String targetCityId,
+            GameMode gameMode
+    ){
+        this(type, lobbyId, playerId, moveSteps, stops, targetCityId, gameMode, null, null, null, null);
+    }
+
+    public ClientCommand(
+            CommandType type,
+            String lobbyId,
+            String playerId,
+            Integer moveSteps,
+            Integer stops,
+            String targetCityId,
+            GameMode gameMode,
+            String winnerPlayerId,
+            String clientId
+    ){
+        this(type, lobbyId, playerId, moveSteps, stops, targetCityId, gameMode, winnerPlayerId, clientId, null, null);
     }
 }

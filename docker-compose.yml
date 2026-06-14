@@ -1,0 +1,29 @@
+services:
+  weltreise-server:
+    image: ghcr.io/${REGISTRY_USER:-weltreise-dora-the-explorer}/weltreise-server:latest
+    container_name: weltreise-server
+    restart: unless-stopped
+    ports:
+      # Host-Port 53205 -> Container-Port 8080 (wie im Deploy-Workflow)
+      - "53205:8080"
+    volumes:
+      # Persistente Lobby-Daten (/data, siehe application.properties: app.data.dir)
+      - /home/grp-1/weltreise-data:/data
+    environment:
+      # JVM soll sich am Container-Memory-Limit orientieren, nicht am Host-RAM
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    healthcheck:
+      # nutzt den Actuator-Health-Endpoint (wget ist im Image vorhanden)
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s

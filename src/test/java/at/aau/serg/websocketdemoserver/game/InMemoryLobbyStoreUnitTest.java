@@ -1,9 +1,14 @@
 package at.aau.serg.websocketdemoserver.game;
 
+import at.aau.serg.websocketdemoserver.game.minigame.FlagQuestion;
+import at.aau.serg.websocketdemoserver.game.minigame.MinigameSubPhase;
+import at.aau.serg.websocketdemoserver.game.minigame.MinigameType;
+import at.aau.serg.websocketdemoserver.messaging.dtos.GamePhase;
 import at.aau.serg.websocketdemoserver.messaging.dtos.GameRoomState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -223,5 +228,42 @@ class InMemoryLobbyStoreUnitTest {
 
         plainStore.save();
         // no exception thrown, backward compat preserved
+    }
+
+    // ========== RECOVERY TESTS ==========
+
+    @Test
+    void recoverResetsFlagMinigameThatLostItsAnswerKey() {
+        GameRoomState state = new GameRoomState();
+        state.setPhase(GamePhase.MINIGAME);
+        state.setSelectedMinigame(MinigameType.FLAG_GAME);
+        state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
+        state.setCurrentPlayerId("player-1");
+        state.getFlagScores().put("player-1", 2);
+        // flagRounds leer = Answer-Key nach Neustart weg
+        store.put("lobby-1", state);
+
+        store.recoverInterruptedFlagMinigames();
+
+        GameRoomState recovered = store.get("lobby-1").orElseThrow();
+        assertThat(recovered.getPhase()).isEqualTo(GamePhase.IN_TURN);
+        assertThat(recovered.getSelectedMinigame()).isNull();
+        assertThat(recovered.getMinigameSubPhase()).isNull();
+        assertThat(recovered.getFlagScores()).isEmpty();
+        assertThat(recovered.getCurrentPlayerId()).isEqualTo("player-1"); // Zug bleibt beim Stadteroberer
+    }
+
+    @Test
+    void recoverKeepsFlagMinigameThatStillHasItsAnswerKey() {
+        GameRoomState state = new GameRoomState();
+        state.setPhase(GamePhase.MINIGAME);
+        state.setSelectedMinigame(MinigameType.FLAG_GAME);
+        state.setMinigameSubPhase(MinigameSubPhase.PLAYING);
+        state.setFlagRounds(List.of(new FlagQuestion("ar", List.of("a", "b", "c", "d"), "a")));
+        store.put("lobby-2", state);
+
+        store.recoverInterruptedFlagMinigames();
+
+        assertThat(store.get("lobby-2").orElseThrow().getPhase()).isEqualTo(GamePhase.MINIGAME);
     }
 }
